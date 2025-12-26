@@ -1,0 +1,24 @@
+---
+layout: default
+---
+<article class="log">
+  <header class="log-header">
+    <h1 class="log-title">{{ page.title | default: page.name }}</h1>
+    {% if page.date %}
+      <div class="log-meta">{{ page.date | date: "%Y-%m-%d" }}</div>
+    {% endif %}
+    <div class="log-links">
+      <a href="{{ '/dev-log/' | relative_url }}">← Dev Log</a>
+      <span> / </span>
+      <a href="#toc">TOC</a>
+    </div>
+  </header>
+
+  <div class="log-body">
+    {{ content }}
+  </div>
+
+  <div class="back-to-top">
+    <a href="#toc">↑ Back to TOC</a>
+  </div>
+</article>

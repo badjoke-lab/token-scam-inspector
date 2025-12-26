@@ -6,7 +6,7 @@ permalink: pretty
 # IMPORTANT:
 # - User/Org Pages: baseurl: ""
 # - Project Pages: baseurl: "/REPOSITORY-NAME"
-baseurl: ""
+baseurl: "token-scam-inspector"
 
 # GitHub Pagesは安全上、プラグインが強く制限されるので使わない方針
 # （この構成はプラグイン不要）

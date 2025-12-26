@@ -1,0 +1,23 @@
+:root { --fg:#111; --muted:#666; --bg:#fff; --border:#e5e5e5; }
+* { box-sizing: border-box; }
+body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color:var(--fg); background:var(--bg); }
+a { color: inherit; }
+.container { max-width: 920px; margin: 0 auto; padding: 16px; }
+
+.site-header { border-bottom: 1px solid var(--border); background: #fff; position: sticky; top:0; }
+.site-header .container { display:flex; justify-content:space-between; align-items:center; gap: 12px; }
+.brand a { font-weight: 700; text-decoration:none; }
+.nav a { margin-left: 12px; text-decoration:none; color: var(--muted); }
+.nav a:hover { color: var(--fg); }
+
+.site-footer { border-top: 1px solid var(--border); margin-top: 28px; color: var(--muted); }
+
+.log-title { margin: 0 0 6px; }
+.log-meta { color: var(--muted); margin-bottom: 10px; }
+.log-links { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+.log-body h2, .log-body h3 { margin-top: 28px; }
+.back-to-top { margin-top: 28px; color: var(--muted); }
+
+.list { padding-left: 18px; }
+.list li { margin: 6px 0; }
+.badge { display:inline-block; padding: 2px 8px; border:1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--muted); }

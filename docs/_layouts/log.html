@@ -2,9 +2,32 @@
 layout: default
 ---
 <article class="log">
-  <h1>{{ page.title }}</h1>
-  {% if page.date %}
-    <p class="meta">{{ page.date | date: "%Y-%m-%d" }}</p>
+  <header class="log-head">
+    <h1>{{ page.title }}</h1>
+    {% if page.date %}<div class="log-date">{{ page.date | date: "%Y-%m-%d" }}</div>{% endif %}
+  </header>
+
+  {% comment %} この記事本文（通常のMarkdown） {% endcomment %}
+  <div class="log-body">
+    {{ content }}
+  </div>
+
+  {% comment %} front matterに user/gpt を持たせる場合はここで描画 {% endcomment %}
+  {% if page.user %}
+  <section class="chat-section">
+    <div class="chat-label">🧠 User</div>
+    <div class="chat-bubble user">
+      {{ page.user | markdownify }}
+    </div>
+  </section>
   {% endif %}
-  {{ content }}
+
+  {% if page.gpt %}
+  <section class="chat-section">
+    <div class="chat-label">🤖 GPT</div>
+    <div class="chat-bubble gpt">
+      {{ page.gpt | markdownify }}
+    </div>
+  </section>
+  {% endif %}
 </article>

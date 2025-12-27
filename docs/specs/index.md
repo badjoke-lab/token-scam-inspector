@@ -3,22 +3,10 @@ layout: default
 title: Specs
 ---
 
-<a id="toc"></a>
 # Specs
 
-{% assign specs = site.pages
-  | where_exp: "p", "p.url contains '/specs/'"
-  | where_exp: "p", "p.url != '/specs/'"
-  | sort: "title"
-%}
-
-<ul class="list">
-{% for p in specs %}
-  <li>
-    <a href="{{ p.url | relative_url }}">{{ p.title | default: p.name }}</a>
-  </li>
-{% endfor %}
-</ul>
-
-[↑ Back to TOC](#toc)
-
+- [Future Vision]({{ "/specs/future_vision_phased_plan-ja/" | relative_url }})
+- [Roadmap]({{ "/specs/roadmap-phase1-ja/" | relative_url }})
+- [Phase1 Spec]({{ "/specs/spec-phase1-ja/" | relative_url }})
+- [UI Spec]({{ "/specs/ui-spec-ja/" | relative_url }})
+- [Directory Tree]({{ "/specs/directory-tree-phase1-ja/" | relative_url }})

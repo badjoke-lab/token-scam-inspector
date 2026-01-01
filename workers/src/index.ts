@@ -1,3 +1,6 @@
+import { fetchExplorerFacts } from "./explorer/client";
+import type { Chain, ExplorerFacts } from "./explorer/types";
+
 const jsonResponse = (body: unknown, init?: ResponseInit): Response => {
   const headers = new Headers(init?.headers);
   headers.set("content-type", "application/json; charset=utf-8");
@@ -23,43 +26,136 @@ const isValidAddress = (address: string): boolean =>
 const CACHE_TTL_SECONDS = 86400;
 const CACHE_CONTROL = `public, max-age=${CACHE_TTL_SECONDS}`;
 
+type EvidenceEntry = {
+  source: string;
+  label: string;
+  value: string | boolean;
+  note?: string;
+};
+
+const buildEvidenceNote = (code?: string): string | undefined =>
+  code ? `Explorer data unavailable: ${code}` : undefined;
+
+const buildExplorerEvidence = (
+  label: string,
+  value: string | boolean,
+  note?: string
+): EvidenceEntry => ({
+  source: "explorer",
+  label,
+  value,
+  note,
+});
+
+const buildExplorerEvidenceEntries = (
+  facts: ExplorerFacts
+): {
+  contractVerification: EvidenceEntry[];
+  ownerPrivileges: EvidenceEntry[];
+  holderConcentration: EvidenceEntry[];
+} => {
+  const sourceNote = buildEvidenceNote(facts.source.error?.code);
+  const creationNote = buildEvidenceNote(facts.creation.error?.code);
+  const holderNote = buildEvidenceNote(facts.holders.error?.code);
+
+  const contractVerification: EvidenceEntry[] = [
+    buildExplorerEvidence(
+      "contract source available",
+      facts.source.data.sourceAvailable,
+      sourceNote
+    ),
+    buildExplorerEvidence(
+      "proxy indicator",
+      facts.source.data.isProxy,
+      sourceNote
+    ),
+  ];
+
+  const ownerPrivileges: EvidenceEntry[] = [
+    buildExplorerEvidence(
+      "creator address",
+      facts.creation.data.creatorAddress,
+      creationNote
+    ),
+    buildExplorerEvidence(
+      "creation transaction hash",
+      facts.creation.data.creationTxHash,
+      creationNote
+    ),
+  ];
+
+  const holderConcentration: EvidenceEntry[] = [
+    buildExplorerEvidence(
+      "holder list availability",
+      facts.holders.data.holderListAvailable,
+      holderNote
+    ),
+  ];
+
+  return { contractVerification, ownerPrivileges, holderConcentration };
+};
+
 const buildInspectPayload = (
   chain: string,
   address: string,
   cached: boolean,
-  generatedAt: string
-) => ({
-  ok: true,
-  input: { chain, address },
-  result: {
-    overall: "unknown",
-    summary: [
-      "This is a dummy response (no real inspection yet).",
-      "It shows the output format only.",
-      "No verdict / no investment advice.",
+  generatedAt: string,
+  explorerFacts?: ExplorerFacts
+) => {
+  const explorerEvidence = explorerFacts
+    ? buildExplorerEvidenceEntries(explorerFacts)
+    : null;
+
+  return {
+    ok: true,
+    input: { chain, address },
+    result: {
+      overall: "unknown",
+      summary: [
+        "This response is an early foundation; checks remain unknown.",
+        "Explorer data is included when available.",
+        "No verdict / no investment advice.",
+      ],
+    },
+    checks: [
+      {
+        id: "contract_verification",
+        label: "Contract verification",
+        status: "unknown",
+        why: "Source availability is fetched but not evaluated in this stage.",
+        evidence: explorerEvidence ? explorerEvidence.contractVerification : [],
+      },
+      {
+        id: "owner_privileges",
+        label: "Owner / privileges",
+        status: "unknown",
+        why: "Creator and privilege checks are not analyzed in this stage.",
+        evidence: explorerEvidence ? explorerEvidence.ownerPrivileges : [],
+      },
+      {
+        id: "holder_concentration",
+        label: "Holder concentration",
+        status: "unknown",
+        why: "Holder list data is not analyzed in this stage.",
+        evidence: explorerEvidence ? explorerEvidence.holderConcentration : [],
+      },
+      {
+        id: "dummy_format",
+        label: "Output format",
+        status: "ok",
+        why: "The endpoint returns explainable JSON with neutral language.",
+        evidence: [],
+      },
     ],
-  },
-  checks: [
-    {
-      id: "dummy_sources",
-      label: "Data sources",
-      status: "unknown",
-      why: "External data sources are not connected in this stage.",
-      evidence: [],
-    },
-    {
-      id: "dummy_format",
-      label: "Output format",
-      status: "ok",
-      why: "The endpoint returns explainable JSON with neutral language.",
-      evidence: [],
-    },
-  ],
-  meta: { generatedAt, cached },
-});
+    meta: { generatedAt, cached },
+  };
+};
 
 export default {
-  async fetch(request: Request): Promise<Response> {
+  async fetch(
+    request: Request,
+    env?: { ETHERSCAN_API_KEY?: string }
+  ): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method === "GET" && url.pathname === "/api/hello") {
@@ -95,11 +191,17 @@ export default {
 
       try {
         const generatedAt = new Date().toISOString();
+        const explorerFacts = await fetchExplorerFacts(
+          chain as Chain,
+          address,
+          env?.ETHERSCAN_API_KEY
+        );
         const responseBody = buildInspectPayload(
           chain,
           address,
           false,
-          generatedAt
+          generatedAt,
+          explorerFacts
         );
         const response = jsonResponse(responseBody, {
           headers: { "Cache-Control": CACHE_CONTROL },
@@ -109,7 +211,8 @@ export default {
           chain,
           address,
           true,
-          generatedAt
+          generatedAt,
+          explorerFacts
         );
         const cacheResponse = jsonResponse(cachedBody, {
           headers: { "Cache-Control": CACHE_CONTROL },

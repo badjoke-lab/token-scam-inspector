@@ -63,6 +63,16 @@ type MintCapabilityCheck = {
   howToVerify: string[];
 };
 
+type LiquidityLockCheck = {
+  id: "liquidity_lock";
+  label: "Liquidity Lock Status";
+  result: "ok" | "warn" | "high" | "unknown";
+  short: string;
+  detail: string;
+  evidence: string[];
+  howToVerify: string[];
+};
+
 const buildEvidenceNote = (code?: string): string | undefined =>
   code ? `Explorer data unavailable: ${code}` : undefined;
 
@@ -144,6 +154,15 @@ const MINT_CAPABILITY_SHORT = "Token supply might increase later.";
 const MINT_CAPABILITY_DETAIL = "Unlimited minting can crash price.";
 const MINT_CAPABILITY_VERIFY_STEPS = [
   "Review verified source or ABI for mint-related functions and permissions.",
+];
+
+const LIQUIDITY_LOCK_SHORT = "Liquidity might be removable.";
+const LIQUIDITY_LOCK_DETAIL =
+  "Removing liquidity makes selling impossible. Phase 1 data sources cannot confirm LP lock status.";
+const LIQUIDITY_LOCK_VERIFY_STEPS = [
+  "Check the LP token holder on the DEX pair and see if it is locked or burned.",
+  "Look for a reputable locker (Team Finance, Unicrypt, etc.) and verify the lock transaction.",
+  "If liquidity is burned, verify LP tokens are sent to a dead address.",
 ];
 
 const SELL_RESTRICTION_HIGH_PATTERNS = [
@@ -418,6 +437,16 @@ const buildMintCapabilityCheck = (
   };
 };
 
+const buildLiquidityLockCheck = (): LiquidityLockCheck => ({
+  id: "liquidity_lock",
+  label: "Liquidity Lock Status",
+  result: "unknown",
+  short: LIQUIDITY_LOCK_SHORT,
+  detail: LIQUIDITY_LOCK_DETAIL,
+  evidence: ["LP lock status could not be verified (Phase 1 limitation)."],
+  howToVerify: LIQUIDITY_LOCK_VERIFY_STEPS,
+});
+
 const buildInspectPayload = (
   chain: string,
   address: string,
@@ -444,19 +473,20 @@ const buildInspectPayload = (
       buildSellRestrictionCheck(explorerFacts ?? undefined),
       buildOwnerPrivilegesCheck(explorerFacts ?? undefined),
       buildMintCapabilityCheck(explorerFacts ?? undefined),
-      {
-        id: "contract_verification",
-        label: "Contract verification",
-        status: "unknown",
-        why: "Source availability is fetched but not evaluated in this stage.",
-        evidence: explorerEvidence ? explorerEvidence.contractVerification : [],
-      },
+      buildLiquidityLockCheck(),
       {
         id: "holder_concentration",
         label: "Holder concentration",
         status: "unknown",
         why: "Holder list data is not analyzed in this stage.",
         evidence: explorerEvidence ? explorerEvidence.holderConcentration : [],
+      },
+      {
+        id: "contract_verification",
+        label: "Contract verification",
+        status: "unknown",
+        why: "Source availability is fetched but not evaluated in this stage.",
+        evidence: explorerEvidence ? explorerEvidence.contractVerification : [],
       },
       {
         id: "dummy_format",

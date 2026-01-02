@@ -33,6 +33,16 @@ type EvidenceEntry = {
   note?: string;
 };
 
+type SellRestrictionCheck = {
+  id: "sell_restriction";
+  label: "Sell Restriction / Honeypot";
+  result: "ok" | "warn" | "high" | "unknown";
+  short: string;
+  detail: string;
+  evidence: string[];
+  howToVerify: string[];
+};
+
 const buildEvidenceNote = (code?: string): string | undefined =>
   code ? `Explorer data unavailable: ${code}` : undefined;
 
@@ -95,6 +105,103 @@ const buildExplorerEvidenceEntries = (
   return { contractVerification, ownerPrivileges, holderConcentration };
 };
 
+const SELL_RESTRICTION_SHORT = "You may not be able to sell this token.";
+const SELL_RESTRICTION_DETAIL =
+  "Buying is allowed but selling may be blocked or heavily taxed.";
+const SELL_RESTRICTION_VERIFY_STEPS = [
+  "Check explorer verified source and look for transfer restrictions.",
+  "Try a tiny swap on a trusted tool.",
+];
+
+const SELL_RESTRICTION_HIGH_PATTERNS = [
+  "blacklist",
+  "isBlacklisted",
+  "whitelist",
+  "onlyWhitelisted",
+  "tradingEnabled",
+  "enableTrading",
+  "tradingOpen",
+  "whenTradingEnabled",
+];
+
+const SELL_RESTRICTION_WARN_PATTERNS = [
+  "antiBot",
+  "cooldown",
+  "transferDelay",
+  "maxSell",
+  "sellLimit",
+  "sellTax",
+];
+
+const buildSellRestrictionEvidence = (
+  matches: string[],
+  reason?: string
+): string[] => {
+  if (reason) {
+    return [`Source unavailable: ${reason}.`];
+  }
+
+  if (matches.length > 0) {
+    return matches.map((match) => `Found "${match}" pattern.`);
+  }
+
+  return [
+    `Scanned for patterns: ${[
+      ...SELL_RESTRICTION_HIGH_PATTERNS,
+      ...SELL_RESTRICTION_WARN_PATTERNS,
+    ].join(", ")}.`,
+  ];
+};
+
+const buildSellRestrictionCheck = (
+  explorerFacts?: ExplorerFacts
+): SellRestrictionCheck => {
+  const sourceFacts = explorerFacts?.source;
+  const sourceStatus = sourceFacts?.data.sourceAvailable;
+  const sourceCode = sourceFacts?.data.sourceCode ?? "";
+
+  if (sourceStatus !== true || sourceCode.trim() === "") {
+    const reason =
+      sourceFacts?.error?.code ??
+      (sourceStatus === false ? "source_unavailable" : "source_unavailable");
+    return {
+      id: "sell_restriction",
+      label: "Sell Restriction / Honeypot",
+      result: "unknown",
+      short: SELL_RESTRICTION_SHORT,
+      detail: SELL_RESTRICTION_DETAIL,
+      evidence: buildSellRestrictionEvidence([], reason),
+      howToVerify: SELL_RESTRICTION_VERIFY_STEPS,
+    };
+  }
+
+  const sourceLower = sourceCode.toLowerCase();
+  const highMatches = SELL_RESTRICTION_HIGH_PATTERNS.filter((pattern) =>
+    sourceLower.includes(pattern.toLowerCase())
+  );
+  const warnMatches = SELL_RESTRICTION_WARN_PATTERNS.filter((pattern) =>
+    sourceLower.includes(pattern.toLowerCase())
+  );
+  const matches = [...highMatches, ...warnMatches];
+
+  let result: SellRestrictionCheck["result"] = "ok";
+  if (highMatches.length > 0) {
+    result = "high";
+  } else if (warnMatches.length > 0) {
+    result = "warn";
+  }
+
+  return {
+    id: "sell_restriction",
+    label: "Sell Restriction / Honeypot",
+    result,
+    short: SELL_RESTRICTION_SHORT,
+    detail: SELL_RESTRICTION_DETAIL,
+    evidence: buildSellRestrictionEvidence(matches),
+    howToVerify: SELL_RESTRICTION_VERIFY_STEPS,
+  };
+};
+
 const buildInspectPayload = (
   chain: string,
   address: string,
@@ -118,6 +225,7 @@ const buildInspectPayload = (
       ],
     },
     checks: [
+      buildSellRestrictionCheck(explorerFacts ?? undefined),
       {
         id: "contract_verification",
         label: "Contract verification",

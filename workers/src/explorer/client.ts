@@ -15,6 +15,7 @@ const DEFAULT_TIMEOUT_MS = 8000;
 const unknownSourceFacts: ContractSourceFacts = {
   sourceAvailable: "unknown",
   isProxy: "unknown",
+  sourceCode: "",
 };
 
 const unknownCreationFacts: ContractCreationFacts = {
@@ -195,6 +196,7 @@ const getContractSourceFacts = async (
       sourceAvailable: sourceCode.trim() !== "",
       isProxy:
         proxyFlag === "1" ? true : proxyFlag === "0" ? false : "unknown",
+      sourceCode,
     },
   };
 };

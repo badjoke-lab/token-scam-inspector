@@ -3,6 +3,7 @@ import type {
   Chain,
   ExplorerErrorCode,
   ExplorerFacts,
+  ExplorerValue,
 } from "./explorer/types";
 
 const jsonResponse = (body: unknown, init?: ResponseInit): Response => {
@@ -29,13 +30,6 @@ const isValidAddress = (address: string): boolean =>
 
 const CACHE_TTL_SECONDS = 86400;
 const CACHE_CONTROL = `public, max-age=${CACHE_TTL_SECONDS}`;
-
-type EvidenceEntry = {
-  source: string;
-  label: string;
-  value: string | boolean;
-  note?: string;
-};
 
 type SellRestrictionCheck = {
   id: "sell_restriction";
@@ -87,56 +81,14 @@ type HolderConcentrationCheck = {
   howToVerify: string[];
 };
 
-const buildEvidenceNote = (code?: string): string | undefined =>
-  code ? `Explorer data unavailable: ${code}` : undefined;
-
-const buildExplorerEvidence = (
-  label: string,
-  value: string | boolean,
-  note?: string
-): EvidenceEntry => ({
-  source: "explorer",
-  label,
-  value,
-  note,
-});
-
-const buildExplorerEvidenceEntries = (
-  facts: ExplorerFacts
-): {
-  contractVerification: EvidenceEntry[];
-  ownerPrivileges: EvidenceEntry[];
-} => {
-  const sourceNote = buildEvidenceNote(facts.source.error?.code);
-  const creationNote = buildEvidenceNote(facts.creation.error?.code);
-
-  const contractVerification: EvidenceEntry[] = [
-    buildExplorerEvidence(
-      "contract source available",
-      facts.source.data.sourceAvailable,
-      sourceNote
-    ),
-    buildExplorerEvidence(
-      "proxy indicator",
-      facts.source.data.isProxy,
-      sourceNote
-    ),
-  ];
-
-  const ownerPrivileges: EvidenceEntry[] = [
-    buildExplorerEvidence(
-      "creator address",
-      facts.creation.data.creatorAddress,
-      creationNote
-    ),
-    buildExplorerEvidence(
-      "creation transaction hash",
-      facts.creation.data.creationTxHash,
-      creationNote
-    ),
-  ];
-
-  return { contractVerification, ownerPrivileges };
+type ContractVerificationCheck = {
+  id: "contract_verification";
+  label: "Contract Verification";
+  result: "ok" | "warn" | "high" | "unknown";
+  short: string;
+  detail: string;
+  evidence: string[];
+  howToVerify: string[];
 };
 
 const SELL_RESTRICTION_SHORT = "You may not be able to sell this token.";
@@ -175,6 +127,17 @@ const HOLDER_CONCENTRATION_VERIFY_STEPS = [
   "Open the token holders page on the explorer and check Top holders distribution.",
   "Compare Top 1/5/10 share and watch for unusually high concentration.",
 ];
+
+const CONTRACT_VERIFICATION_SHORT = "Contract code may be hidden.";
+const CONTRACT_VERIFICATION_DETAIL = "Unverified code hides malicious logic.";
+const CONTRACT_VERIFICATION_VERIFY_STEPS = [
+  "Open the explorer page and check whether the contract is verified.",
+];
+
+const EXPLORER_ADDRESS_BASE: Record<Chain, string> = {
+  eth: "https://etherscan.io/address/",
+  bsc: "https://bscscan.com/address/",
+};
 
 const SELL_RESTRICTION_HIGH_PATTERNS = [
   "blacklist",
@@ -231,6 +194,18 @@ const MINT_CAPABILITY_ROLE_PATTERNS = [
   "setminter",
   "addminter",
 ];
+
+const buildExplorerAddressUrl = (
+  chain: string,
+  address: string
+): string | null => {
+  const normalizedChain = chain.toLowerCase() as Chain;
+  const baseUrl = EXPLORER_ADDRESS_BASE[normalizedChain];
+  if (!baseUrl) {
+    return null;
+  }
+  return `${baseUrl}${address}#code`;
+};
 
 const buildSellRestrictionEvidence = (
   matches: string[],
@@ -542,6 +517,79 @@ const buildHolderConcentrationCheck = (
   };
 };
 
+const contractVerificationReason = (
+  code?: ExplorerErrorCode
+): string => {
+  switch (code) {
+    case "missing_api_key":
+      return "Explorer API key is missing for contract verification data.";
+    case "rate_limited":
+      return "Explorer rate limit blocked contract verification data.";
+    case "not_supported":
+      return "Explorer does not support contract verification on this chain.";
+    case "timeout":
+      return "Explorer request timed out while fetching contract verification data.";
+    case "unavailable_on_free_plan":
+      return "Contract verification data is unavailable on the free explorer plan.";
+    case "upstream_error":
+    default:
+      return "Explorer contract verification data could not be retrieved.";
+  }
+};
+
+const buildContractVerificationEvidence = (
+  chain: string,
+  address: string,
+  sourceAvailable?: ExplorerValue,
+  errorCode?: ExplorerErrorCode
+): string[] => {
+  const explorerUrl = buildExplorerAddressUrl(chain, address);
+  const urlSuffix = explorerUrl ? ` (${explorerUrl})` : "";
+
+  if (sourceAvailable === true) {
+    return [`Verified source code: yes${urlSuffix}`];
+  }
+
+  if (sourceAvailable === false) {
+    return [`Verified source code: no${urlSuffix}`];
+  }
+
+  const reason = contractVerificationReason(errorCode);
+  return [explorerUrl ? `${reason} (${explorerUrl})` : reason];
+};
+
+const buildContractVerificationCheck = (
+  chain: string,
+  address: string,
+  explorerFacts?: ExplorerFacts
+): ContractVerificationCheck => {
+  const sourceFacts = explorerFacts?.source;
+  const sourceStatus = sourceFacts?.data.sourceAvailable;
+  const evidence = buildContractVerificationEvidence(
+    chain,
+    address,
+    sourceStatus,
+    sourceFacts?.error?.code
+  );
+
+  let result: ContractVerificationCheck["result"] = "unknown";
+  if (sourceStatus === true) {
+    result = "ok";
+  } else if (sourceStatus === false) {
+    result = "warn";
+  }
+
+  return {
+    id: "contract_verification",
+    label: "Contract Verification",
+    result,
+    short: CONTRACT_VERIFICATION_SHORT,
+    detail: CONTRACT_VERIFICATION_DETAIL,
+    evidence,
+    howToVerify: CONTRACT_VERIFICATION_VERIFY_STEPS,
+  };
+};
+
 const buildInspectPayload = (
   chain: string,
   address: string,
@@ -549,10 +597,6 @@ const buildInspectPayload = (
   generatedAt: string,
   explorerFacts?: ExplorerFacts
 ) => {
-  const explorerEvidence = explorerFacts
-    ? buildExplorerEvidenceEntries(explorerFacts)
-    : null;
-
   return {
     ok: true,
     input: { chain, address },
@@ -570,13 +614,7 @@ const buildInspectPayload = (
       buildMintCapabilityCheck(explorerFacts ?? undefined),
       buildLiquidityLockCheck(),
       buildHolderConcentrationCheck(explorerFacts ?? undefined),
-      {
-        id: "contract_verification",
-        label: "Contract verification",
-        status: "unknown",
-        why: "Source availability is fetched but not evaluated in this stage.",
-        evidence: explorerEvidence ? explorerEvidence.contractVerification : [],
-      },
+      buildContractVerificationCheck(chain, address, explorerFacts ?? undefined),
       {
         id: "dummy_format",
         label: "Output format",

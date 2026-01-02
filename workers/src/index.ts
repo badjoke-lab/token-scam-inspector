@@ -43,6 +43,16 @@ type SellRestrictionCheck = {
   howToVerify: string[];
 };
 
+type OwnerPrivilegesCheck = {
+  id: "owner_privileges";
+  label: "Owner Privileges";
+  result: "ok" | "warn" | "high" | "unknown";
+  short: string;
+  detail: string;
+  evidence: string[];
+  howToVerify: string[];
+};
+
 const buildEvidenceNote = (code?: string): string | undefined =>
   code ? `Explorer data unavailable: ${code}` : undefined;
 
@@ -113,6 +123,13 @@ const SELL_RESTRICTION_VERIFY_STEPS = [
   "Try a tiny swap on a trusted tool.",
 ];
 
+const OWNER_PRIVILEGES_SHORT = "The owner may change critical rules.";
+const OWNER_PRIVILEGES_DETAIL =
+  "Owner-controlled parameters can turn a token into a trap later.";
+const OWNER_PRIVILEGES_VERIFY_STEPS = [
+  "Review verified source on the explorer for owner-only functions.",
+];
+
 const SELL_RESTRICTION_HIGH_PATTERNS = [
   "blacklist",
   "isBlacklisted",
@@ -133,6 +150,27 @@ const SELL_RESTRICTION_WARN_PATTERNS = [
   "sellTax",
 ];
 
+const OWNER_PRIVILEGES_OWNER_PATTERNS = [
+  "owner",
+  "onlyOwner",
+  "transferOwnership",
+  "renounceOwnership",
+  "ownable",
+];
+
+const OWNER_PRIVILEGES_HIGH_PATTERNS = ["blacklist", "whitelist"];
+
+const OWNER_PRIVILEGES_WARN_PATTERNS = [
+  "setFee",
+  "setTax",
+  "setMaxTx",
+  "setMaxWallet",
+  "setLimits",
+  "setLimit",
+  "enableTrading",
+  "tradingEnabled",
+];
+
 const buildSellRestrictionEvidence = (
   matches: string[],
   reason?: string
@@ -149,6 +187,31 @@ const buildSellRestrictionEvidence = (
     `Scanned for patterns: ${[
       ...SELL_RESTRICTION_HIGH_PATTERNS,
       ...SELL_RESTRICTION_WARN_PATTERNS,
+    ].join(", ")}.`,
+  ];
+};
+
+const buildOwnerPrivilegesEvidence = (
+  ownerMatches: string[],
+  changeMatches: string[],
+  reason?: string
+): string[] => {
+  if (reason) {
+    return [`Source unavailable: ${reason}.`];
+  }
+
+  if (ownerMatches.length > 0 || changeMatches.length > 0) {
+    return [
+      ...ownerMatches.map((match) => `Found owner pattern: "${match}".`),
+      ...changeMatches.map((match) => `Found rule-change pattern: "${match}".`),
+    ];
+  }
+
+  return [
+    `Scanned for owner patterns: ${OWNER_PRIVILEGES_OWNER_PATTERNS.join(", ")}.`,
+    `Scanned for rule-change patterns: ${[
+      ...OWNER_PRIVILEGES_HIGH_PATTERNS,
+      ...OWNER_PRIVILEGES_WARN_PATTERNS,
     ].join(", ")}.`,
   ];
 };
@@ -202,6 +265,58 @@ const buildSellRestrictionCheck = (
   };
 };
 
+const buildOwnerPrivilegesCheck = (
+  explorerFacts?: ExplorerFacts
+): OwnerPrivilegesCheck => {
+  const sourceFacts = explorerFacts?.source;
+  const sourceStatus = sourceFacts?.data.sourceAvailable;
+  const sourceCode = sourceFacts?.data.sourceCode ?? "";
+
+  if (sourceStatus !== true || sourceCode.trim() === "") {
+    const reason =
+      sourceFacts?.error?.code ??
+      (sourceStatus === false ? "source_unavailable" : "source_unavailable");
+    return {
+      id: "owner_privileges",
+      label: "Owner Privileges",
+      result: "unknown",
+      short: OWNER_PRIVILEGES_SHORT,
+      detail: OWNER_PRIVILEGES_DETAIL,
+      evidence: buildOwnerPrivilegesEvidence([], [], reason),
+      howToVerify: OWNER_PRIVILEGES_VERIFY_STEPS,
+    };
+  }
+
+  const sourceLower = sourceCode.toLowerCase();
+  const ownerMatches = OWNER_PRIVILEGES_OWNER_PATTERNS.filter((pattern) =>
+    sourceLower.includes(pattern.toLowerCase())
+  );
+  const changeHighMatches = OWNER_PRIVILEGES_HIGH_PATTERNS.filter((pattern) =>
+    sourceLower.includes(pattern.toLowerCase())
+  );
+  const changeWarnMatches = OWNER_PRIVILEGES_WARN_PATTERNS.filter((pattern) =>
+    sourceLower.includes(pattern.toLowerCase())
+  );
+  const changeMatches = [...changeHighMatches, ...changeWarnMatches];
+
+  let result: OwnerPrivilegesCheck["result"] = "ok";
+  if (ownerMatches.length > 0 && changeHighMatches.length > 0) {
+    result = "high";
+  } else if (ownerMatches.length > 0 && changeWarnMatches.length > 0) {
+    result = "warn";
+  }
+
+  return {
+    id: "owner_privileges",
+    label: "Owner Privileges",
+    result,
+    short: OWNER_PRIVILEGES_SHORT,
+    detail: OWNER_PRIVILEGES_DETAIL,
+    evidence: buildOwnerPrivilegesEvidence(ownerMatches, changeMatches),
+    howToVerify: OWNER_PRIVILEGES_VERIFY_STEPS,
+  };
+};
+
 const buildInspectPayload = (
   chain: string,
   address: string,
@@ -226,19 +341,13 @@ const buildInspectPayload = (
     },
     checks: [
       buildSellRestrictionCheck(explorerFacts ?? undefined),
+      buildOwnerPrivilegesCheck(explorerFacts ?? undefined),
       {
         id: "contract_verification",
         label: "Contract verification",
         status: "unknown",
         why: "Source availability is fetched but not evaluated in this stage.",
         evidence: explorerEvidence ? explorerEvidence.contractVerification : [],
-      },
-      {
-        id: "owner_privileges",
-        label: "Owner / privileges",
-        status: "unknown",
-        why: "Creator and privilege checks are not analyzed in this stage.",
-        evidence: explorerEvidence ? explorerEvidence.ownerPrivileges : [],
       },
       {
         id: "holder_concentration",

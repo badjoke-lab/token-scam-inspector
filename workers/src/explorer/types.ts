@@ -26,6 +26,7 @@ export interface ExplorerResult<T> {
 export interface ContractSourceFacts {
   sourceAvailable: ExplorerValue;
   isProxy: ExplorerValue;
+  sourceCode: string;
 }
 
 export interface ContractCreationFacts {

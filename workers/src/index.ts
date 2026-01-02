@@ -1,5 +1,9 @@
 import { fetchExplorerFacts } from "./explorer/client";
-import type { Chain, ExplorerFacts } from "./explorer/types";
+import type {
+  Chain,
+  ExplorerErrorCode,
+  ExplorerFacts,
+} from "./explorer/types";
 
 const jsonResponse = (body: unknown, init?: ResponseInit): Response => {
   const headers = new Headers(init?.headers);
@@ -73,6 +77,16 @@ type LiquidityLockCheck = {
   howToVerify: string[];
 };
 
+type HolderConcentrationCheck = {
+  id: "holder_concentration";
+  label: "Holder Concentration";
+  result: "ok" | "warn" | "high" | "unknown";
+  short: string;
+  detail: string;
+  evidence: string[];
+  howToVerify: string[];
+};
+
 const buildEvidenceNote = (code?: string): string | undefined =>
   code ? `Explorer data unavailable: ${code}` : undefined;
 
@@ -92,11 +106,9 @@ const buildExplorerEvidenceEntries = (
 ): {
   contractVerification: EvidenceEntry[];
   ownerPrivileges: EvidenceEntry[];
-  holderConcentration: EvidenceEntry[];
 } => {
   const sourceNote = buildEvidenceNote(facts.source.error?.code);
   const creationNote = buildEvidenceNote(facts.creation.error?.code);
-  const holderNote = buildEvidenceNote(facts.holders.error?.code);
 
   const contractVerification: EvidenceEntry[] = [
     buildExplorerEvidence(
@@ -124,15 +136,7 @@ const buildExplorerEvidenceEntries = (
     ),
   ];
 
-  const holderConcentration: EvidenceEntry[] = [
-    buildExplorerEvidence(
-      "holder list availability",
-      facts.holders.data.holderListAvailable,
-      holderNote
-    ),
-  ];
-
-  return { contractVerification, ownerPrivileges, holderConcentration };
+  return { contractVerification, ownerPrivileges };
 };
 
 const SELL_RESTRICTION_SHORT = "You may not be able to sell this token.";
@@ -163,6 +167,13 @@ const LIQUIDITY_LOCK_VERIFY_STEPS = [
   "Check the LP token holder on the DEX pair and see if it is locked or burned.",
   "Look for a reputable locker (Team Finance, Unicrypt, etc.) and verify the lock transaction.",
   "If liquidity is burned, verify LP tokens are sent to a dead address.",
+];
+
+const HOLDER_CONCENTRATION_SHORT = "A few wallets may control most tokens.";
+const HOLDER_CONCENTRATION_DETAIL = "Large holders can dump and crash price.";
+const HOLDER_CONCENTRATION_VERIFY_STEPS = [
+  "Open the token holders page on the explorer and check Top holders distribution.",
+  "Compare Top 1/5/10 share and watch for unusually high concentration.",
 ];
 
 const SELL_RESTRICTION_HIGH_PATTERNS = [
@@ -447,6 +458,90 @@ const buildLiquidityLockCheck = (): LiquidityLockCheck => ({
   howToVerify: LIQUIDITY_LOCK_VERIFY_STEPS,
 });
 
+const buildHolderConcentrationEvidence = (
+  top1: number,
+  top5: number,
+  top10: number
+): string[] => [
+  `Top 1 holders: ${top1.toFixed(1)}%`,
+  `Top 5 holders: ${top5.toFixed(1)}%`,
+  `Top 10 holders: ${top10.toFixed(1)}%`,
+  "Source: explorer API",
+];
+
+const holderConcentrationResult = (
+  top1: number,
+  top5: number,
+  top10: number
+): HolderConcentrationCheck["result"] => {
+  if (top1 >= 50 || top5 >= 80 || top10 >= 90) {
+    return "high";
+  }
+
+  if (top1 >= 30 || top5 >= 60 || top10 >= 75) {
+    return "warn";
+  }
+
+  return "ok";
+};
+
+const holderConcentrationReason = (
+  code?: ExplorerErrorCode
+): string => {
+  switch (code) {
+    case "missing_api_key":
+      return "Explorer API key is missing for holder list data.";
+    case "rate_limited":
+      return "Explorer rate limit blocked holder list retrieval.";
+    case "not_supported":
+      return "Explorer does not support holder lists for this chain.";
+    case "timeout":
+      return "Explorer request timed out while fetching holders.";
+    case "unavailable_on_free_plan":
+      return "Holder list data is unavailable on the free explorer plan.";
+    case "upstream_error":
+    default:
+      return "Explorer holder list could not be retrieved.";
+  }
+};
+
+const buildHolderConcentrationCheck = (
+  explorerFacts?: ExplorerFacts
+): HolderConcentrationCheck => {
+  const holderFacts = explorerFacts?.holders;
+  const topHolderPercents = holderFacts?.data.topHolderPercents ?? [];
+
+  if (topHolderPercents.length >= 10) {
+    const top1 = topHolderPercents[0];
+    const top5 = topHolderPercents.slice(0, 5).reduce((sum, value) => sum + value, 0);
+    const top10 = topHolderPercents
+      .slice(0, 10)
+      .reduce((sum, value) => sum + value, 0);
+
+    return {
+      id: "holder_concentration",
+      label: "Holder Concentration",
+      result: holderConcentrationResult(top1, top5, top10),
+      short: HOLDER_CONCENTRATION_SHORT,
+      detail: HOLDER_CONCENTRATION_DETAIL,
+      evidence: buildHolderConcentrationEvidence(top1, top5, top10),
+      howToVerify: HOLDER_CONCENTRATION_VERIFY_STEPS,
+    };
+  }
+
+  const reason = holderConcentrationReason(holderFacts?.error?.code);
+
+  return {
+    id: "holder_concentration",
+    label: "Holder Concentration",
+    result: "unknown",
+    short: HOLDER_CONCENTRATION_SHORT,
+    detail: `${HOLDER_CONCENTRATION_DETAIL} ${reason}`,
+    evidence: [reason],
+    howToVerify: HOLDER_CONCENTRATION_VERIFY_STEPS,
+  };
+};
+
 const buildInspectPayload = (
   chain: string,
   address: string,
@@ -474,13 +569,7 @@ const buildInspectPayload = (
       buildOwnerPrivilegesCheck(explorerFacts ?? undefined),
       buildMintCapabilityCheck(explorerFacts ?? undefined),
       buildLiquidityLockCheck(),
-      {
-        id: "holder_concentration",
-        label: "Holder concentration",
-        status: "unknown",
-        why: "Holder list data is not analyzed in this stage.",
-        evidence: explorerEvidence ? explorerEvidence.holderConcentration : [],
-      },
+      buildHolderConcentrationCheck(explorerFacts ?? undefined),
       {
         id: "contract_verification",
         label: "Contract verification",

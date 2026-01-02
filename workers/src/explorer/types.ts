@@ -35,7 +35,8 @@ export interface ContractCreationFacts {
 }
 
 export interface HolderFacts {
-  holderListAvailable: "unknown";
+  holderListAvailable: boolean | "unknown";
+  topHolderPercents: number[];
 }
 
 export interface ExplorerFacts {

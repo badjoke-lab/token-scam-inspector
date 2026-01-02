@@ -53,6 +53,16 @@ type OwnerPrivilegesCheck = {
   howToVerify: string[];
 };
 
+type MintCapabilityCheck = {
+  id: "mint_capability";
+  label: "Mint Capability";
+  result: "ok" | "warn" | "high" | "unknown";
+  short: string;
+  detail: string;
+  evidence: string[];
+  howToVerify: string[];
+};
+
 const buildEvidenceNote = (code?: string): string | undefined =>
   code ? `Explorer data unavailable: ${code}` : undefined;
 
@@ -130,6 +140,12 @@ const OWNER_PRIVILEGES_VERIFY_STEPS = [
   "Review verified source on the explorer for owner-only functions.",
 ];
 
+const MINT_CAPABILITY_SHORT = "Token supply might increase later.";
+const MINT_CAPABILITY_DETAIL = "Unlimited minting can crash price.";
+const MINT_CAPABILITY_VERIFY_STEPS = [
+  "Review verified source or ABI for mint-related functions and permissions.",
+];
+
 const SELL_RESTRICTION_HIGH_PATTERNS = [
   "blacklist",
   "isBlacklisted",
@@ -169,6 +185,21 @@ const OWNER_PRIVILEGES_WARN_PATTERNS = [
   "setLimit",
   "enableTrading",
   "tradingEnabled",
+];
+
+const MINT_CAPABILITY_MINT_PATTERNS = [
+  "mint",
+  "_mint",
+  "mintto",
+  "mint(address",
+  "increaseSupply",
+];
+
+const MINT_CAPABILITY_ROLE_PATTERNS = [
+  "minter_role",
+  "onlyminter",
+  "setminter",
+  "addminter",
 ];
 
 const buildSellRestrictionEvidence = (
@@ -213,6 +244,28 @@ const buildOwnerPrivilegesEvidence = (
       ...OWNER_PRIVILEGES_HIGH_PATTERNS,
       ...OWNER_PRIVILEGES_WARN_PATTERNS,
     ].join(", ")}.`,
+  ];
+};
+
+const buildMintCapabilityEvidence = (
+  mintMatches: string[],
+  roleMatches: string[],
+  reason?: string
+): string[] => {
+  if (reason) {
+    return [`Source unavailable: ${reason}.`];
+  }
+
+  if (mintMatches.length > 0 || roleMatches.length > 0) {
+    return [
+      ...mintMatches.map((match) => `Found mint pattern: "${match}".`),
+      ...roleMatches.map((match) => `Found mint-role pattern: "${match}".`),
+    ];
+  }
+
+  return [
+    `Scanned for mint patterns: ${MINT_CAPABILITY_MINT_PATTERNS.join(", ")}.`,
+    `Scanned for mint-role patterns: ${MINT_CAPABILITY_ROLE_PATTERNS.join(", ")}.`,
   ];
 };
 
@@ -317,6 +370,54 @@ const buildOwnerPrivilegesCheck = (
   };
 };
 
+const buildMintCapabilityCheck = (
+  explorerFacts?: ExplorerFacts
+): MintCapabilityCheck => {
+  const sourceFacts = explorerFacts?.source;
+  const sourceStatus = sourceFacts?.data.sourceAvailable;
+  const sourceCode = sourceFacts?.data.sourceCode ?? "";
+
+  if (sourceStatus !== true || sourceCode.trim() === "") {
+    const reason =
+      sourceFacts?.error?.code ??
+      (sourceStatus === false ? "source_unavailable" : "source_unavailable");
+    return {
+      id: "mint_capability",
+      label: "Mint Capability",
+      result: "unknown",
+      short: MINT_CAPABILITY_SHORT,
+      detail: MINT_CAPABILITY_DETAIL,
+      evidence: buildMintCapabilityEvidence([], [], reason),
+      howToVerify: MINT_CAPABILITY_VERIFY_STEPS,
+    };
+  }
+
+  const sourceLower = sourceCode.toLowerCase();
+  const mintMatches = MINT_CAPABILITY_MINT_PATTERNS.filter((pattern) =>
+    sourceLower.includes(pattern.toLowerCase())
+  );
+  const roleMatches = MINT_CAPABILITY_ROLE_PATTERNS.filter((pattern) =>
+    sourceLower.includes(pattern.toLowerCase())
+  );
+
+  let result: MintCapabilityCheck["result"] = "ok";
+  if (mintMatches.length > 0 && roleMatches.length > 0) {
+    result = "high";
+  } else if (mintMatches.length > 0 || roleMatches.length > 0) {
+    result = "warn";
+  }
+
+  return {
+    id: "mint_capability",
+    label: "Mint Capability",
+    result,
+    short: MINT_CAPABILITY_SHORT,
+    detail: MINT_CAPABILITY_DETAIL,
+    evidence: buildMintCapabilityEvidence(mintMatches, roleMatches),
+    howToVerify: MINT_CAPABILITY_VERIFY_STEPS,
+  };
+};
+
 const buildInspectPayload = (
   chain: string,
   address: string,
@@ -342,6 +443,7 @@ const buildInspectPayload = (
     checks: [
       buildSellRestrictionCheck(explorerFacts ?? undefined),
       buildOwnerPrivilegesCheck(explorerFacts ?? undefined),
+      buildMintCapabilityCheck(explorerFacts ?? undefined),
       {
         id: "contract_verification",
         label: "Contract verification",

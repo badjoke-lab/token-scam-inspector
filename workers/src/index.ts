@@ -91,6 +91,16 @@ type ContractVerificationCheck = {
   howToVerify: string[];
 };
 
+type TradingEnableControlCheck = {
+  id: "trading_enable_control";
+  label: "Trading Enable Control";
+  result: "ok" | "warn" | "high" | "unknown";
+  short: string;
+  detail: string;
+  evidence: string[];
+  howToVerify: string[];
+};
+
 const SELL_RESTRICTION_SHORT = "You may not be able to sell this token.";
 const SELL_RESTRICTION_DETAIL =
   "Buying is allowed but selling may be blocked or heavily taxed.";
@@ -132,6 +142,14 @@ const CONTRACT_VERIFICATION_SHORT = "Contract code may be hidden.";
 const CONTRACT_VERIFICATION_DETAIL = "Unverified code hides malicious logic.";
 const CONTRACT_VERIFICATION_VERIFY_STEPS = [
   "Open the explorer page and check whether the contract is verified.",
+];
+
+const TRADING_ENABLE_CONTROL_SHORT = "Trading might be paused or restricted.";
+const TRADING_ENABLE_CONTROL_DETAIL =
+  "Trading can be stopped after users buy.";
+const TRADING_ENABLE_CONTROL_VERIFY_STEPS = [
+  "Open the explorer verified source or ABI, then search for pause/trading toggle functions.",
+  "Review any pause/tradingEnabled functions and who can call them.",
 ];
 
 const EXPLORER_ADDRESS_BASE: Record<Chain, string> = {
@@ -193,6 +211,23 @@ const MINT_CAPABILITY_ROLE_PATTERNS = [
   "onlyminter",
   "setminter",
   "addminter",
+];
+
+const TRADING_ENABLE_CONTROL_HIGH_PATTERNS = [
+  "pause",
+  "paused",
+  "unpause",
+  "disableTrading",
+  "stopTrading",
+  "resumeTrading",
+];
+
+const TRADING_ENABLE_CONTROL_WARN_PATTERNS = [
+  "tradingEnabled",
+  "enableTrading",
+  "setTrading",
+  "openTrading",
+  "tradingActive",
 ];
 
 const buildExplorerAddressUrl = (
@@ -517,6 +552,99 @@ const buildHolderConcentrationCheck = (
   };
 };
 
+const tradingEnableControlReason = (
+  code?: ExplorerErrorCode | "source_unavailable"
+): string => {
+  switch (code) {
+    case "missing_api_key":
+      return "Explorer API key is missing for contract source data.";
+    case "rate_limited":
+      return "Explorer rate limit blocked contract source retrieval.";
+    case "not_supported":
+      return "Explorer does not support contract source on this chain.";
+    case "timeout":
+      return "Explorer request timed out while fetching contract source data.";
+    case "unavailable_on_free_plan":
+      return "Contract source data is unavailable on the free explorer plan.";
+    case "source_unavailable":
+      return "Verified source code is unavailable.";
+    case "upstream_error":
+    default:
+      return "Explorer contract source data could not be retrieved.";
+  }
+};
+
+const buildTradingEnableControlEvidence = (
+  matches: string[],
+  reason?: ExplorerErrorCode | "source_unavailable"
+): string[] => {
+  if (reason) {
+    return [`Source unavailable: ${reason}.`];
+  }
+
+  if (matches.length > 0) {
+    return matches.map((match) => `Detected signal: ${match}`);
+  }
+
+  return [
+    `Scanned for patterns: ${[
+      ...TRADING_ENABLE_CONTROL_HIGH_PATTERNS,
+      ...TRADING_ENABLE_CONTROL_WARN_PATTERNS,
+    ].join(", ")}.`,
+  ];
+};
+
+const buildTradingEnableControlCheck = (
+  explorerFacts?: ExplorerFacts
+): TradingEnableControlCheck => {
+  const sourceFacts = explorerFacts?.source;
+  const sourceStatus = sourceFacts?.data.sourceAvailable;
+  const sourceCode = sourceFacts?.data.sourceCode ?? "";
+
+  if (sourceStatus !== true || sourceCode.trim() === "") {
+    const reason =
+      sourceFacts?.error?.code ??
+      (sourceStatus === false ? "source_unavailable" : "source_unavailable");
+    return {
+      id: "trading_enable_control",
+      label: "Trading Enable Control",
+      result: "unknown",
+      short: TRADING_ENABLE_CONTROL_SHORT,
+      detail: `${TRADING_ENABLE_CONTROL_DETAIL} ${tradingEnableControlReason(
+        reason
+      )}`,
+      evidence: buildTradingEnableControlEvidence([], reason),
+      howToVerify: TRADING_ENABLE_CONTROL_VERIFY_STEPS,
+    };
+  }
+
+  const sourceLower = sourceCode.toLowerCase();
+  const highMatches = TRADING_ENABLE_CONTROL_HIGH_PATTERNS.filter((pattern) =>
+    sourceLower.includes(pattern.toLowerCase())
+  );
+  const warnMatches = TRADING_ENABLE_CONTROL_WARN_PATTERNS.filter((pattern) =>
+    sourceLower.includes(pattern.toLowerCase())
+  );
+  const matches = [...highMatches, ...warnMatches];
+
+  let result: TradingEnableControlCheck["result"] = "ok";
+  if (highMatches.length > 0) {
+    result = "high";
+  } else if (warnMatches.length > 0) {
+    result = "warn";
+  }
+
+  return {
+    id: "trading_enable_control",
+    label: "Trading Enable Control",
+    result,
+    short: TRADING_ENABLE_CONTROL_SHORT,
+    detail: TRADING_ENABLE_CONTROL_DETAIL,
+    evidence: buildTradingEnableControlEvidence(matches),
+    howToVerify: TRADING_ENABLE_CONTROL_VERIFY_STEPS,
+  };
+};
+
 const contractVerificationReason = (
   code?: ExplorerErrorCode
 ): string => {
@@ -615,6 +743,7 @@ const buildInspectPayload = (
       buildLiquidityLockCheck(),
       buildHolderConcentrationCheck(explorerFacts ?? undefined),
       buildContractVerificationCheck(chain, address, explorerFacts ?? undefined),
+      buildTradingEnableControlCheck(explorerFacts ?? undefined),
       {
         id: "dummy_format",
         label: "Output format",

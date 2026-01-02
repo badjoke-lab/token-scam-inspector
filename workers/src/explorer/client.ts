@@ -25,6 +25,7 @@ const unknownCreationFacts: ContractCreationFacts = {
 
 const unknownHolderFacts: HolderFacts = {
   holderListAvailable: "unknown",
+  topHolderPercents: [],
 };
 
 export const fetchJsonWithTimeout = async (
@@ -89,6 +90,19 @@ const normalizeEtherscanError = (payload: unknown): ExplorerError => {
     return {
       code: "missing_api_key",
       message: "Explorer API key is missing.",
+      upstream: "etherscan",
+    };
+  }
+
+  if (
+    lowered.includes("upgrade") ||
+    lowered.includes("not available") ||
+    lowered.includes("pro") ||
+    lowered.includes("premium")
+  ) {
+    return {
+      code: "unavailable_on_free_plan",
+      message: "Explorer feature is unavailable on the free plan.",
       upstream: "etherscan",
     };
   }
@@ -264,28 +278,250 @@ const getContractCreationFacts = async (
   };
 };
 
-const getHolderFacts = (): ExplorerResult<HolderFacts> => ({
-  data: { ...unknownHolderFacts },
-  error: {
-    code: "unavailable_on_free_plan",
-    message: "Explorer holder list is unavailable on the free plan.",
-    upstream: "etherscan",
-  },
-});
+const parseNumericString = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.replace(/[%\s,]/g, "");
+    const parsed = Number.parseFloat(normalized);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+};
+
+const parseBigIntString = (value: unknown): bigint | null => {
+  if (typeof value === "bigint") {
+    return value;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return BigInt(Math.trunc(value));
+  }
+
+  if (typeof value === "string" && /^[0-9]+$/.test(value)) {
+    return BigInt(value);
+  }
+
+  return null;
+};
+
+const findPercentInEntry = (entry: Record<string, unknown>): number | null => {
+  for (const [key, value] of Object.entries(entry)) {
+    const lowered = key.toLowerCase();
+    if (
+      lowered.includes("percent") ||
+      lowered.includes("percentage") ||
+      lowered.includes("share")
+    ) {
+      const parsed = parseNumericString(value);
+      if (parsed !== null) {
+        return parsed;
+      }
+    }
+  }
+
+  return null;
+};
+
+const findQuantityInEntry = (entry: Record<string, unknown>): bigint | null => {
+  for (const [key, value] of Object.entries(entry)) {
+    const lowered = key.toLowerCase();
+    if (
+      lowered.includes("quantity") ||
+      lowered.includes("balance") ||
+      lowered.includes("amount") ||
+      lowered.includes("value")
+    ) {
+      const parsed = parseBigIntString(value);
+      if (parsed !== null) {
+        return parsed;
+      }
+    }
+  }
+
+  return null;
+};
+
+const getTokenSupply = async (
+  chain: Chain,
+  address: string,
+  apiKey: string
+): Promise<{ value?: bigint; error?: ExplorerError }> => {
+  const url = new URL(BASE_URL);
+  url.searchParams.set("chainid", CHAIN_IDS[chain].toString());
+  url.searchParams.set("module", "stats");
+  url.searchParams.set("action", "tokensupply");
+  url.searchParams.set("contractaddress", address);
+  url.searchParams.set("apikey", apiKey);
+
+  const response = await fetchJsonWithTimeout(url.toString());
+  if (response.error) {
+    return { error: response.error };
+  }
+
+  const parsed = parseEtherscanResult(response.data);
+  if (parsed.error) {
+    return { error: parsed.error };
+  }
+
+  const supplyValue = parseBigIntString(parsed.result);
+  if (supplyValue === null) {
+    return {
+      error: {
+        code: "upstream_error",
+        message: "Explorer returned an invalid total supply.",
+        upstream: "etherscan",
+      },
+    };
+  }
+
+  return { value: supplyValue };
+};
+
+const getHolderFacts = async (
+  chain: Chain,
+  address: string,
+  apiKey?: string
+): Promise<ExplorerResult<HolderFacts>> => {
+  if (!apiKey) {
+    return { data: { ...unknownHolderFacts }, error: createMissingKeyError() };
+  }
+
+  if (!(chain in CHAIN_IDS)) {
+    return { data: { ...unknownHolderFacts }, error: createUnsupportedChainError() };
+  }
+
+  const url = new URL(BASE_URL);
+  url.searchParams.set("chainid", CHAIN_IDS[chain].toString());
+  url.searchParams.set("module", "token");
+  url.searchParams.set("action", "tokenholderlist");
+  url.searchParams.set("contractaddress", address);
+  url.searchParams.set("page", "1");
+  url.searchParams.set("offset", "10");
+  url.searchParams.set("apikey", apiKey);
+
+  const response = await fetchJsonWithTimeout(url.toString());
+  if (response.error) {
+    return { data: { ...unknownHolderFacts }, error: response.error };
+  }
+
+  const parsed = parseEtherscanResult(response.data);
+  if (parsed.error) {
+    return { data: { ...unknownHolderFacts }, error: parsed.error };
+  }
+
+  if (!Array.isArray(parsed.result) || parsed.result.length === 0) {
+    return {
+      data: { ...unknownHolderFacts },
+      error: {
+        code: "upstream_error",
+        message: "Explorer returned an empty holder list.",
+        upstream: "etherscan",
+      },
+    };
+  }
+
+  const entries = parsed.result.slice(0, 10).filter(
+    (entry): entry is Record<string, unknown> =>
+      entry !== null && typeof entry === "object"
+  );
+
+  if (entries.length < 10) {
+    return {
+      data: { ...unknownHolderFacts, holderListAvailable: true },
+      error: {
+        code: "upstream_error",
+        message: "Explorer returned fewer than 10 holders.",
+        upstream: "etherscan",
+      },
+    };
+  }
+
+  let totalSupply: bigint | null = null;
+  const percents: number[] = [];
+
+  for (const entry of entries) {
+    const percent = findPercentInEntry(entry);
+    if (percent !== null) {
+      percents.push(percent);
+      continue;
+    }
+
+    if (totalSupply === null) {
+      const supplyResponse = await getTokenSupply(chain, address, apiKey);
+      if (supplyResponse.error) {
+        return {
+          data: { ...unknownHolderFacts, holderListAvailable: true },
+          error: supplyResponse.error,
+        };
+      }
+      totalSupply = supplyResponse.value ?? null;
+      if (!totalSupply || totalSupply <= 0n) {
+        return {
+          data: { ...unknownHolderFacts, holderListAvailable: true },
+          error: {
+            code: "upstream_error",
+            message: "Explorer returned an invalid total supply.",
+            upstream: "etherscan",
+          },
+        };
+      }
+    }
+
+    const quantity = findQuantityInEntry(entry);
+    if (!quantity || totalSupply <= 0n) {
+      return {
+        data: { ...unknownHolderFacts, holderListAvailable: true },
+        error: {
+          code: "upstream_error",
+          message: "Explorer holder list did not include balances.",
+          upstream: "etherscan",
+        },
+      };
+    }
+
+    const percentScaled = (quantity * 10000n) / totalSupply;
+    percents.push(Number(percentScaled) / 100);
+  }
+
+  if (percents.length < 10) {
+    return {
+      data: { ...unknownHolderFacts, holderListAvailable: true },
+      error: {
+        code: "upstream_error",
+        message: "Explorer holder list did not include percentage data.",
+        upstream: "etherscan",
+      },
+    };
+  }
+
+  return {
+    data: {
+      holderListAvailable: true,
+      topHolderPercents: percents.slice(0, 10),
+    },
+  };
+};
 
 export const fetchExplorerFacts = async (
   chain: Chain,
   address: string,
   apiKey?: string
 ): Promise<ExplorerFacts> => {
-  const [source, creation] = await Promise.all([
+  const [source, creation, holders] = await Promise.all([
     getContractSourceFacts(chain, address, apiKey),
     getContractCreationFacts(chain, address, apiKey),
+    getHolderFacts(chain, address, apiKey),
   ]);
 
   return {
     source,
     creation,
-    holders: getHolderFacts(),
+    holders,
   };
 };

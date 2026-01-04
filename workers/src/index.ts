@@ -31,10 +31,13 @@ const isValidAddress = (address: string): boolean =>
 const CACHE_TTL_SECONDS = 86400;
 const CACHE_CONTROL = `public, max-age=${CACHE_TTL_SECONDS}`;
 
+type CheckResult = "ok" | "warn" | "high" | "unknown";
+type OverallRisk = "low" | "medium" | "high" | "unknown";
+
 type SellRestrictionCheck = {
   id: "sell_restriction";
   label: "Sell Restriction / Honeypot";
-  result: "ok" | "warn" | "high" | "unknown";
+  result: CheckResult;
   short: string;
   detail: string;
   evidence: string[];
@@ -44,7 +47,7 @@ type SellRestrictionCheck = {
 type OwnerPrivilegesCheck = {
   id: "owner_privileges";
   label: "Owner Privileges";
-  result: "ok" | "warn" | "high" | "unknown";
+  result: CheckResult;
   short: string;
   detail: string;
   evidence: string[];
@@ -54,7 +57,7 @@ type OwnerPrivilegesCheck = {
 type MintCapabilityCheck = {
   id: "mint_capability";
   label: "Mint Capability";
-  result: "ok" | "warn" | "high" | "unknown";
+  result: CheckResult;
   short: string;
   detail: string;
   evidence: string[];
@@ -64,7 +67,7 @@ type MintCapabilityCheck = {
 type LiquidityLockCheck = {
   id: "liquidity_lock";
   label: "Liquidity Lock Status";
-  result: "ok" | "warn" | "high" | "unknown";
+  result: CheckResult;
   short: string;
   detail: string;
   evidence: string[];
@@ -74,7 +77,7 @@ type LiquidityLockCheck = {
 type HolderConcentrationCheck = {
   id: "holder_concentration";
   label: "Holder Concentration";
-  result: "ok" | "warn" | "high" | "unknown";
+  result: CheckResult;
   short: string;
   detail: string;
   evidence: string[];
@@ -84,7 +87,7 @@ type HolderConcentrationCheck = {
 type ContractVerificationCheck = {
   id: "contract_verification";
   label: "Contract Verification";
-  result: "ok" | "warn" | "high" | "unknown";
+  result: CheckResult;
   short: string;
   detail: string;
   evidence: string[];
@@ -94,11 +97,124 @@ type ContractVerificationCheck = {
 type TradingEnableControlCheck = {
   id: "trading_enable_control";
   label: "Trading Enable Control";
-  result: "ok" | "warn" | "high" | "unknown";
+  result: CheckResult;
   short: string;
   detail: string;
   evidence: string[];
   howToVerify: string[];
+};
+
+type CheckWithResult = {
+  result: CheckResult;
+  short: string;
+};
+
+const CHECK_RESULTS = new Set<CheckResult>([
+  "ok",
+  "warn",
+  "high",
+  "unknown",
+]);
+
+const isCheckWithResult = (check: unknown): check is CheckWithResult => {
+  if (!check || typeof check !== "object") {
+    return false;
+  }
+
+  const maybeCheck = check as { result?: unknown; short?: unknown };
+  return (
+    typeof maybeCheck.short === "string" &&
+    typeof maybeCheck.result === "string" &&
+    CHECK_RESULTS.has(maybeCheck.result as CheckResult)
+  );
+};
+
+const buildOverallRisk = (checks: unknown[]): OverallRisk => {
+  let highCount = 0;
+  let warnCount = 0;
+  let okCount = 0;
+  let unknownCount = 0;
+
+  for (const check of checks) {
+    if (!isCheckWithResult(check)) {
+      continue;
+    }
+
+    switch (check.result) {
+      case "high":
+        highCount += 1;
+        break;
+      case "warn":
+        warnCount += 1;
+        break;
+      case "ok":
+        okCount += 1;
+        break;
+      case "unknown":
+        unknownCount += 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (highCount >= 1) {
+    return "high";
+  }
+
+  if (warnCount >= 1) {
+    return "medium";
+  }
+
+  if (okCount >= 1 && unknownCount === 0) {
+    return "low";
+  }
+
+  if (highCount === 0 && warnCount === 0 && unknownCount >= 1) {
+    return "unknown";
+  }
+
+  return "unknown";
+};
+
+const buildSummary = (overallRisk: OverallRisk): string => {
+  switch (overallRisk) {
+    case "high":
+      return "High: Some risk indicators were detected.";
+    case "medium":
+      return "Medium: Some risk indicators were detected.";
+    case "low":
+      return "Low: No strong risk indicators were detected in these checks.";
+    case "unknown":
+    default:
+      return "Unknown: Insufficient data to confirm key signals.";
+  }
+};
+
+const buildTopReasons = (checks: unknown[]): string[] => {
+  const reasons: string[] = [];
+
+  for (const check of checks) {
+    if (reasons.length >= 3) {
+      break;
+    }
+
+    if (isCheckWithResult(check) && check.result === "high") {
+      reasons.push(check.short);
+    }
+  }
+
+  for (const check of checks) {
+    if (reasons.length >= 3) {
+      break;
+    }
+
+    if (isCheckWithResult(check) && check.result === "warn") {
+      reasons.push(check.short);
+    }
+  }
+
+  return reasons.slice(0, 3);
 };
 
 const SELL_RESTRICTION_SHORT = "You may not be able to sell this token.";
@@ -725,33 +841,35 @@ const buildInspectPayload = (
   generatedAt: string,
   explorerFacts?: ExplorerFacts
 ) => {
+  const checks = [
+    buildSellRestrictionCheck(explorerFacts ?? undefined),
+    buildOwnerPrivilegesCheck(explorerFacts ?? undefined),
+    buildMintCapabilityCheck(explorerFacts ?? undefined),
+    buildLiquidityLockCheck(),
+    buildHolderConcentrationCheck(explorerFacts ?? undefined),
+    buildContractVerificationCheck(chain, address, explorerFacts ?? undefined),
+    buildTradingEnableControlCheck(explorerFacts ?? undefined),
+    {
+      id: "dummy_format",
+      label: "Output format",
+      status: "ok",
+      why: "The endpoint returns explainable JSON with neutral language.",
+      evidence: [],
+    },
+  ];
+  const overallRisk = buildOverallRisk(checks);
+  const summary = buildSummary(overallRisk);
+  const topReasons = buildTopReasons(checks);
+
   return {
     ok: true,
     input: { chain, address },
     result: {
-      overall: "unknown",
-      summary: [
-        "This response is an early foundation; checks remain unknown.",
-        "Explorer data is included when available.",
-        "No verdict / no investment advice.",
-      ],
+      overallRisk,
+      summary,
+      topReasons,
     },
-    checks: [
-      buildSellRestrictionCheck(explorerFacts ?? undefined),
-      buildOwnerPrivilegesCheck(explorerFacts ?? undefined),
-      buildMintCapabilityCheck(explorerFacts ?? undefined),
-      buildLiquidityLockCheck(),
-      buildHolderConcentrationCheck(explorerFacts ?? undefined),
-      buildContractVerificationCheck(chain, address, explorerFacts ?? undefined),
-      buildTradingEnableControlCheck(explorerFacts ?? undefined),
-      {
-        id: "dummy_format",
-        label: "Output format",
-        status: "ok",
-        why: "The endpoint returns explainable JSON with neutral language.",
-        evidence: [],
-      },
-    ],
+    checks,
     meta: { generatedAt, cached },
   };
 };

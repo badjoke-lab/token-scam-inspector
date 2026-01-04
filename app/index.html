@@ -10,7 +10,29 @@
     <main class="container">
       <h1>Token Scam Inspector</h1>
       <p class="subtitle">Risk signals with explanations. Not a verdict.</p>
-      <p class="note">No verdict / no investment advice</p>
+
+      <form id="inspect-form" class="form">
+        <label for="chain">Chain</label>
+        <select id="chain" name="chain">
+          <option value="eth" selected>Ethereum (ERC-20)</option>
+          <option value="bsc">BSC (BEP-20)</option>
+        </select>
+
+        <label for="address">Contract address</label>
+        <input id="address" name="address" type="text" placeholder="0x..." autocomplete="off" />
+
+        <button id="inspect-button" type="submit">Inspect</button>
+      </form>
+
+      <p class="status" id="status">Idle.</p>
+
+      <section class="results">
+        <h2>Raw JSON</h2>
+        <pre><code id="result">{}</code></pre>
+      </section>
+
+      <p class="note">This tool shows risk signals with explanations. Not a verdict.</p>
+      <p class="note">No investment advice.</p>
     </main>
     <script src="./app.js"></script>
   </body>

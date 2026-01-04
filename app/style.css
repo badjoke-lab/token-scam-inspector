@@ -22,6 +22,44 @@ body {
   margin-top: 8px;
 }
 
+.form {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0 16px;
+}
+
+input,
+select,
+button {
+  width: 100%;
+  font: inherit;
+  padding: 8px;
+}
+
+button {
+  cursor: pointer;
+}
+
+.status {
+  margin: 12px 0 20px;
+}
+
+.results h2 {
+  margin-bottom: 8px;
+}
+
+pre {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+code {
+  display: block;
+  white-space: pre;
+}
+
 .note {
   margin-top: 12px;
 }

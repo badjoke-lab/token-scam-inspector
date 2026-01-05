@@ -7,6 +7,8 @@ const statusLine = document.getElementById("status");
 const resultCode = document.getElementById("result");
 const inspectButton = document.getElementById("inspect-button");
 
+const WORKERS_API_BASE = "https://REPLACE_ME.workers.dev";
+
 let isLoading = false;
 
 const setLoading = (loading) => {
@@ -25,12 +27,15 @@ const renderJson = (data) => {
   resultCode.textContent = JSON.stringify(data, null, 2);
 };
 
-const buildUrl = (chain, address) => {
+const buildUrl = (baseUrl, chain, address) => {
   const params = new URLSearchParams({
     chain,
     address,
   });
-  return `/api/inspect?${params.toString()}`;
+  if (!baseUrl) {
+    return `/api/inspect?${params.toString()}`;
+  }
+  return `${baseUrl.replace(/\/$/, "")}/api/inspect?${params.toString()}`;
 };
 
 const parseResponse = async (response) => {
@@ -44,6 +49,18 @@ const parseResponse = async (response) => {
     };
   }
 };
+
+const isJsonResponse = (response) => {
+  const contentType = response.headers.get("content-type") || "";
+  return contentType.includes("application/json");
+};
+
+const fetchInspect = async (baseUrl, chain, address) =>
+  fetch(buildUrl(baseUrl, chain, address), {
+    headers: {
+      Accept: "application/json",
+    },
+  });
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -59,11 +76,17 @@ form.addEventListener("submit", async (event) => {
   setLoading(true);
 
   try {
-    const response = await fetch(buildUrl(chain, address), {
-      headers: {
-        Accept: "application/json",
-      },
-    });
+    let response = await fetchInspect("", chain, address);
+    if (!isJsonResponse(response)) {
+      if (WORKERS_API_BASE.includes("REPLACE_ME")) {
+        const message =
+          "API route is not connected on pages.dev. Set WORKERS_API_BASE to your deployed workers.dev URL.";
+        updateStatus(message);
+        renderJson({ error: message });
+        return;
+      }
+      response = await fetchInspect(WORKERS_API_BASE, chain, address);
+    }
 
     const data = await parseResponse(response);
     renderJson(data);

@@ -30,6 +30,23 @@ const isValidAddress = (address: string): boolean =>
 
 const CACHE_TTL_SECONDS = 86400;
 const CACHE_CONTROL = `public, max-age=${CACHE_TTL_SECONDS}`;
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+const withCors = (response: Response): Response => {
+  const headers = new Headers(response.headers);
+  Object.entries(CORS_HEADERS).forEach(([key, value]) => {
+    headers.set(key, value);
+  });
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+};
 
 type CheckResult = "ok" | "warn" | "high" | "unknown";
 type OverallRisk = "low" | "medium" | "high" | "unknown";
@@ -881,8 +898,15 @@ export default {
   ): Promise<Response> {
     const url = new URL(request.url);
 
+    if (
+      request.method === "OPTIONS" &&
+      (url.pathname === "/api/inspect" || url.pathname === "/api/hello")
+    ) {
+      return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+
     if (request.method === "GET" && url.pathname === "/api/hello") {
-      return jsonResponse({ ok: true, message: "hello" });
+      return withCors(jsonResponse({ ok: true, message: "hello" }));
     }
 
     if (request.method === "GET" && url.pathname === "/api/inspect") {
@@ -890,13 +914,13 @@ export default {
       const address = url.searchParams.get("address");
 
       if (!chain || !address) {
-        return errorResponse(
-          "Missing required query parameters: chain and address."
+        return withCors(
+          errorResponse("Missing required query parameters: chain and address.")
         );
       }
 
       if (!isValidAddress(address)) {
-        return errorResponse("Invalid address format.");
+        return withCors(errorResponse("Invalid address format."));
       }
 
       const cacheKeyUrl = new URL("/api/inspect", url.origin);
@@ -909,7 +933,7 @@ export default {
 
       let cachedResponse = await cache.match(cacheKey);
       if (cachedResponse) {
-        return cachedResponse;
+        return withCors(cachedResponse);
       }
 
       try {
@@ -927,7 +951,7 @@ export default {
           explorerFacts
         );
         const response = jsonResponse(responseBody, {
-          headers: { "Cache-Control": CACHE_CONTROL },
+          headers: { "Cache-Control": CACHE_CONTROL, ...CORS_HEADERS },
         });
 
         const cachedBody = buildInspectPayload(
@@ -938,17 +962,19 @@ export default {
           explorerFacts
         );
         const cacheResponse = jsonResponse(cachedBody, {
-          headers: { "Cache-Control": CACHE_CONTROL },
+          headers: { "Cache-Control": CACHE_CONTROL, ...CORS_HEADERS },
         });
 
         await cache.put(cacheKey, cacheResponse.clone());
-        return response;
+        return withCors(response);
       } catch (error) {
         cachedResponse = await cache.match(cacheKey);
         if (cachedResponse) {
-          return cachedResponse;
+          return withCors(cachedResponse);
         }
-        return errorResponse("Unexpected error while generating response.", 500);
+        return withCors(
+          errorResponse("Unexpected error while generating response.", 500)
+        );
       }
     }
 

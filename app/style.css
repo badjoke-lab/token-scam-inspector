@@ -48,6 +48,33 @@ button {
   margin-bottom: 8px;
 }
 
+.results h3 {
+  margin: 8px 0 4px;
+  font-size: 1rem;
+}
+
+.summary-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.results ul {
+  margin: 4px 0 0 20px;
+  padding: 0;
+}
+
+.results li + li {
+  margin-top: 8px;
+}
+
+.results details {
+  margin-top: 8px;
+}
+
+.results p {
+  margin: 4px 0;
+}
+
 pre {
   margin: 0;
   padding: 12px;

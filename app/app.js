@@ -5,12 +5,14 @@ const chainInput = document.getElementById("chain");
 const addressInput = document.getElementById("address");
 const statusLine = document.getElementById("status");
 const summaryOverallRisk = document.getElementById("summary-overall-risk");
+const summaryOverallBadge = document.getElementById("summary-overall-badge");
 const summaryText = document.getElementById("summary-text");
 const summaryTopReasons = document.getElementById("summary-top-reasons");
 const cacheStatus = document.getElementById("cache-status");
 const checksList = document.getElementById("checks-list");
 const resultCode = document.getElementById("result");
 const inspectButton = document.getElementById("inspect-button");
+const resultError = document.getElementById("result-error");
 
 const WORKERS_API_BASE = "https://lingering-frog-8773.badjoke-lab.workers.dev";
 
@@ -36,6 +38,20 @@ const setText = (element, value) => {
   element.textContent = value;
 };
 
+const setBadge = (element, value) => {
+  const normalized = value ? value.toString().toLowerCase() : "unknown";
+  const label =
+    normalized === "ok" ||
+    normalized === "warn" ||
+    normalized === "high" ||
+    normalized === "medium" ||
+    normalized === "low"
+      ? normalized
+      : "unknown";
+  element.textContent = label;
+  element.className = `badge badge-${label}`;
+};
+
 const clearChildren = (element) => {
   element.innerHTML = "";
 };
@@ -57,10 +73,10 @@ const renderList = (listElement, items, emptyMessage) => {
 };
 
 const renderCacheStatus = (headerValue, metaCached) => {
-  const headerText = headerValue ? headerValue.toUpperCase() : "unknown";
-  const metaText =
-    typeof metaCached === "boolean" ? String(metaCached) : "unknown";
-  setText(cacheStatus, `Cache: ${headerText} (meta.cached=${metaText})`);
+  const metaText = typeof metaCached === "boolean" ? String(metaCached) : "unknown";
+  const headerText = headerValue ? headerValue.toUpperCase() : null;
+  const detail = headerText ? ` (header ${headerText})` : "";
+  setText(cacheStatus, `Cached: ${metaText}${detail}`);
 };
 
 const renderChecks = (checks) => {
@@ -74,12 +90,15 @@ const renderChecks = (checks) => {
 
   checks.forEach((check) => {
     const item = document.createElement("li");
+    item.classList.add("check-item");
 
     const header = document.createElement("div");
+    header.classList.add("check-header");
     const label = document.createElement("strong");
     label.textContent = check.label || "Unnamed check";
     const result = document.createElement("span");
-    result.textContent = ` — ${check.result || "unknown"}`;
+    result.className = "badge";
+    setBadge(result, check.result);
     header.appendChild(label);
     header.appendChild(result);
     item.appendChild(header);
@@ -90,59 +109,91 @@ const renderChecks = (checks) => {
       item.appendChild(shortText);
     }
 
-    if (check.detail || check.evidence || check.howToVerify) {
-      const details = document.createElement("details");
-      const summary = document.createElement("summary");
-      summary.textContent = "Details";
-      details.appendChild(summary);
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = "Details";
+    details.appendChild(summary);
 
-      if (check.detail) {
-        const detailText = document.createElement("p");
-        detailText.textContent = check.detail;
-        details.appendChild(detailText);
-      }
+    const detailText = document.createElement("p");
+    detailText.textContent = check.detail || "No detail available.";
+    details.appendChild(detailText);
 
-      if (Array.isArray(check.evidence) && check.evidence.length > 0) {
-        const evidenceTitle = document.createElement("p");
-        evidenceTitle.textContent = "Evidence";
-        details.appendChild(evidenceTitle);
+    const evidenceTitle = document.createElement("p");
+    evidenceTitle.textContent = "Evidence";
+    details.appendChild(evidenceTitle);
 
-        const evidenceList = document.createElement("ul");
-        check.evidence.forEach((entry) => {
-          const li = document.createElement("li");
-          li.textContent = entry;
-          evidenceList.appendChild(li);
-        });
-        details.appendChild(evidenceList);
-      }
-
-      if (Array.isArray(check.howToVerify) && check.howToVerify.length > 0) {
-        const verifyTitle = document.createElement("p");
-        verifyTitle.textContent = "How to verify";
-        details.appendChild(verifyTitle);
-
-        const verifyList = document.createElement("ul");
-        check.howToVerify.forEach((entry) => {
-          const li = document.createElement("li");
-          li.textContent = entry;
-          verifyList.appendChild(li);
-        });
-        details.appendChild(verifyList);
-      }
-
-      item.appendChild(details);
+    const evidenceList = document.createElement("ul");
+    if (Array.isArray(check.evidence) && check.evidence.length > 0) {
+      check.evidence.forEach((entry) => {
+        const li = document.createElement("li");
+        li.textContent = entry;
+        evidenceList.appendChild(li);
+      });
+    } else {
+      const li = document.createElement("li");
+      li.textContent = "No evidence.";
+      evidenceList.appendChild(li);
     }
+    details.appendChild(evidenceList);
+
+    const verifyTitle = document.createElement("p");
+    verifyTitle.textContent = "How to verify";
+    details.appendChild(verifyTitle);
+
+    const verifyList = document.createElement("ul");
+    if (Array.isArray(check.howToVerify) && check.howToVerify.length > 0) {
+      check.howToVerify.forEach((entry) => {
+        const li = document.createElement("li");
+        li.textContent = entry;
+        verifyList.appendChild(li);
+      });
+    } else {
+      const li = document.createElement("li");
+      li.textContent = "No steps.";
+      verifyList.appendChild(li);
+    }
+    details.appendChild(verifyList);
+
+    item.appendChild(details);
 
     checksList.appendChild(item);
   });
 };
 
+const showErrorBox = (message) => {
+  if (!message) {
+    resultError.hidden = true;
+    resultError.textContent = "";
+    return;
+  }
+  resultError.hidden = false;
+  resultError.textContent = message;
+};
+
+const getErrorMessage = (data) => {
+  if (!data) {
+    return "Request did not return an ok response.";
+  }
+  if (data.error && typeof data.error === "object" && data.error.message) {
+    return data.error.message;
+  }
+  if (data.error && typeof data.error === "string") {
+    return data.error;
+  }
+  if (data.message) {
+    return data.message;
+  }
+  if (data.reason) {
+    return data.reason;
+  }
+  return "Request did not return an ok response.";
+};
+
 const renderErrorSummary = (data, cacheHeader) => {
-  const message =
-    data && (data.error || data.message || data.reason)
-      ? data.error || data.message || data.reason
-      : "Request did not return an ok response.";
+  const message = getErrorMessage(data);
+  showErrorBox(message);
   setText(summaryOverallRisk, "unknown");
+  setBadge(summaryOverallBadge, "unknown");
   setText(summaryText, message);
   renderList(summaryTopReasons, [], "No top reasons available.");
   renderChecks([]);
@@ -151,7 +202,9 @@ const renderErrorSummary = (data, cacheHeader) => {
 
 const renderOkSummary = (data, cacheHeader) => {
   const result = data.result || {};
+  showErrorBox("");
   setText(summaryOverallRisk, result.overallRisk || "unknown");
+  setBadge(summaryOverallBadge, result.overallRisk);
   setText(summaryText, result.summary || "No summary available.");
   renderList(
     summaryTopReasons,
@@ -237,7 +290,9 @@ form.addEventListener("submit", async (event) => {
   } catch (error) {
     updateStatus("Network error. Please try again.");
     renderJson({ error: "Network error. Please try again." });
+    showErrorBox("Network error. Please try again.");
     setText(summaryOverallRisk, "unknown");
+    setBadge(summaryOverallBadge, "unknown");
     setText(summaryText, "Network error. Please try again.");
     renderList(summaryTopReasons, [], "No top reasons available.");
     renderChecks([]);

@@ -7,7 +7,7 @@ const statusLine = document.getElementById("status");
 const resultCode = document.getElementById("result");
 const inspectButton = document.getElementById("inspect-button");
 
-const WORKERS_API_BASE = "https://REPLACE_ME.workers.dev";
+const WORKERS_API_BASE = "https://lingering-frog-8773.badjoke-lab.workers.dev";
 
 let isLoading = false;
 

@@ -27,6 +27,8 @@ const errorResponse = (message: string, status = 400): Response =>
 
 const isValidAddress = (address: string): boolean =>
   /^0x[0-9a-fA-F]{40}$/.test(address);
+const isValidChain = (chain: string): chain is Chain =>
+  chain === "eth" || chain === "bsc";
 
 const CACHE_TTL_SECONDS = 86400;
 const CACHE_CONTROL = `public, max-age=${CACHE_TTL_SECONDS}`;
@@ -894,13 +896,6 @@ const buildInspectPayload = (
     buildHolderConcentrationCheck(explorerFacts ?? undefined),
     buildContractVerificationCheck(chain, address, explorerFacts ?? undefined),
     buildTradingEnableControlCheck(explorerFacts ?? undefined),
-    {
-      id: "dummy_format",
-      label: "Output format",
-      status: "ok",
-      why: "The endpoint returns explainable JSON with neutral language.",
-      evidence: [],
-    },
   ];
   const overallRisk = buildOverallRisk(checks);
   const summary = buildSummary(overallRisk);
@@ -987,6 +982,10 @@ export default {
 
       if (!isValidAddress(address)) {
         return withCors(errorResponse("Invalid address format."));
+      }
+
+      if (!isValidChain(chain)) {
+        return withCors(errorResponse("Invalid chain. Use eth or bsc."));
       }
 
       const cacheKeyUrl = new URL("/api/inspect", url.origin);

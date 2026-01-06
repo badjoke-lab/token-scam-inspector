@@ -27,11 +27,15 @@
       <p class="status" id="status">Idle.</p>
 
       <section class="results">
-        <h2>Summary</h2>
+        <h2>Result</h2>
+        <div id="result-error" class="error-box" hidden></div>
         <div class="summary-grid">
           <div>
             <h3>Overall risk</h3>
-            <p id="summary-overall-risk">unknown</p>
+            <p>
+              <span id="summary-overall-risk">unknown</span>
+              <span id="summary-overall-badge" class="badge badge-unknown">unknown</span>
+            </p>
           </div>
           <div>
             <h3>Summary</h3>
@@ -44,8 +48,8 @@
             </ul>
           </div>
           <div>
-            <h3>Cache</h3>
-            <p id="cache-status">Cache: unknown (meta.cached=unknown)</p>
+            <h3>Cached</h3>
+            <p id="cache-status">Cached: unknown</p>
           </div>
         </div>
       </section>

@@ -30,6 +30,8 @@ const isValidAddress = (address: string): boolean =>
 
 const CACHE_TTL_SECONDS = 86400;
 const CACHE_CONTROL = `public, max-age=${CACHE_TTL_SECONDS}`;
+const RATE_LIMIT_WINDOW_SECONDS = 60;
+const RATE_LIMIT_MAX_REQUESTS = 10;
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
@@ -47,6 +49,32 @@ const withCors = (response: Response): Response => {
     headers,
   });
 };
+
+const buildRateLimitKey = (origin: string, ip: string): Request => {
+  const keyUrl = new URL("/__rl__/inspect", origin);
+  keyUrl.searchParams.set("ip", ip);
+  keyUrl.searchParams.set("window", RATE_LIMIT_WINDOW_SECONDS.toString());
+  return new Request(keyUrl.toString(), { method: "GET" });
+};
+
+const buildRateLimitExceededResponse = (): Response =>
+  jsonResponse(
+    {
+      ok: false,
+      error: {
+        code: "rate_limited",
+        message: "Too many requests. Please try again later.",
+      },
+      meta: { generatedAt: new Date().toISOString(), cached: false },
+    },
+    {
+      status: 429,
+      headers: {
+        "Retry-After": RATE_LIMIT_WINDOW_SECONDS.toString(),
+        ...CORS_HEADERS,
+      },
+    }
+  );
 
 type CheckResult = "ok" | "warn" | "high" | "unknown";
 type OverallRisk = "low" | "medium" | "high" | "unknown";
@@ -910,6 +938,44 @@ export default {
     }
 
     if (request.method === "GET" && url.pathname === "/api/inspect") {
+      const cache = caches.default;
+      const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+      const rateLimitKey = buildRateLimitKey(url.origin, ip);
+
+      try {
+        const rateLimitMatch = await cache.match(rateLimitKey);
+        let requestCount = 0;
+
+        if (rateLimitMatch) {
+          const data = (await rateLimitMatch.json().catch(() => null)) as
+            | { count?: number }
+            | null;
+          if (data && typeof data.count === "number") {
+            requestCount = data.count;
+          }
+        }
+
+        if (requestCount >= RATE_LIMIT_MAX_REQUESTS) {
+          return withCors(buildRateLimitExceededResponse());
+        }
+
+        const rateLimitResponse = jsonResponse(
+          {
+            count: requestCount + 1,
+            windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
+            ip,
+          },
+          {
+            headers: {
+              "Cache-Control": `max-age=${RATE_LIMIT_WINDOW_SECONDS}`,
+            },
+          }
+        );
+        await cache.put(rateLimitKey, rateLimitResponse);
+      } catch (error) {
+        // Best-effort limiter; ignore cache failures.
+      }
+
       const chain = url.searchParams.get("chain");
       const address = url.searchParams.get("address");
 
@@ -929,8 +995,6 @@ export default {
       const cacheKey = new Request(cacheKeyUrl.toString(), {
         method: "GET",
       });
-      const cache = caches.default;
-
       let cachedResponse = await cache.match(cacheKey);
       if (cachedResponse) {
         return withCors(cachedResponse);

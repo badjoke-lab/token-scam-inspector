@@ -7,6 +7,7 @@ import {
   type InputErrorCode,
   getBlockingUpstreamError,
 } from "./utils/errors";
+import { findSignals, formatEvidence, preprocessSource, type SignalPattern } from "./utils/sourceScan";
 
 const jsonResponse = (body: unknown, init?: ResponseInit): Response => {
   const headers = new Headers(init?.headers);
@@ -357,77 +358,109 @@ const EXPLORER_ADDRESS_BASE: Record<Chain, string> = {
   bsc: "https://bscscan.com/address/",
 };
 
-const SELL_RESTRICTION_HIGH_PATTERNS = [
-  "blacklist",
-  "isBlacklisted",
-  "whitelist",
-  "onlyWhitelisted",
-  "tradingEnabled",
-  "enableTrading",
-  "tradingOpen",
-  "whenTradingEnabled",
+const SELL_RESTRICTION_HIGH_PATTERNS: SignalPattern[] = [
+  { name: "blacklist", regex: /\bblacklist(ed)?\b/, strength: "strong" },
+  { name: "whitelist", regex: /\bwhitelist(ed)?\b/, strength: "strong" },
+  {
+    name: "tradingEnabled",
+    regex: /\btrading\s*enabled\b|\btradingEnabled\b/,
+    strength: "strong",
+  },
+  { name: "enableTrading", regex: /\benableTrading\b/, strength: "strong" },
+  { name: "tradingOpen", regex: /\btradingOpen\b/, strength: "strong" },
+  {
+    name: "whenTradingEnabled",
+    regex: /\bwhenTradingEnabled\b/,
+    strength: "strong",
+  },
 ];
 
-const SELL_RESTRICTION_WARN_PATTERNS = [
-  "antiBot",
-  "cooldown",
-  "transferDelay",
-  "maxSell",
-  "sellLimit",
-  "sellTax",
+const SELL_RESTRICTION_WARN_PATTERNS: SignalPattern[] = [
+  { name: "antiBot", regex: /\bantiBot\b/, strength: "weak" },
+  { name: "cooldown", regex: /\bcooldown\b/, strength: "weak" },
+  { name: "transferDelay", regex: /\btransferDelay\b/, strength: "weak" },
+  { name: "maxSell", regex: /\bmaxSell\b/, strength: "weak" },
+  { name: "sellLimit", regex: /\bsellLimit\b/, strength: "weak" },
+  { name: "sellTax", regex: /\bsellTax\b/, strength: "weak" },
 ];
 
-const OWNER_PRIVILEGES_OWNER_PATTERNS = [
-  "owner",
-  "onlyOwner",
-  "transferOwnership",
-  "renounceOwnership",
-  "ownable",
+const OWNER_PRIVILEGES_OWNER_PATTERNS: SignalPattern[] = [
+  { name: "owner", regex: /\bowner\b/, strength: "strong" },
+  { name: "onlyOwner", regex: /\bonlyOwner\b/, strength: "strong" },
+  {
+    name: "transferOwnership",
+    regex: /\btransferOwnership\b/,
+    strength: "strong",
+  },
+  {
+    name: "renounceOwnership",
+    regex: /\brenounceOwnership\b/,
+    strength: "strong",
+  },
+  { name: "ownable", regex: /\bownable\b/, strength: "strong" },
 ];
 
-const OWNER_PRIVILEGES_HIGH_PATTERNS = ["blacklist", "whitelist"];
-
-const OWNER_PRIVILEGES_WARN_PATTERNS = [
-  "setFee",
-  "setTax",
-  "setMaxTx",
-  "setMaxWallet",
-  "setLimits",
-  "setLimit",
-  "enableTrading",
-  "tradingEnabled",
+const OWNER_PRIVILEGES_HIGH_PATTERNS: SignalPattern[] = [
+  { name: "blacklist", regex: /\bblacklist(ed)?\b/, strength: "strong" },
+  { name: "whitelist", regex: /\bwhitelist(ed)?\b/, strength: "strong" },
 ];
 
-const MINT_CAPABILITY_MINT_PATTERNS = [
-  "mint",
-  "_mint",
-  "mintto",
-  "mint(address",
-  "increaseSupply",
+const OWNER_PRIVILEGES_WARN_PATTERNS: SignalPattern[] = [
+  { name: "setFee", regex: /\bsetFee\b/, strength: "weak" },
+  { name: "setTax", regex: /\bsetTax\b/, strength: "weak" },
+  { name: "setMaxTx", regex: /\bsetMaxTx\b/, strength: "weak" },
+  { name: "setMaxWallet", regex: /\bsetMaxWallet\b/, strength: "weak" },
+  { name: "setLimits", regex: /\bsetLimits\b/, strength: "weak" },
+  { name: "setLimit", regex: /\bsetLimit\b/, strength: "weak" },
+  { name: "enableTrading", regex: /\benableTrading\b/, strength: "weak" },
+  {
+    name: "tradingEnabled",
+    regex: /\btrading\s*enabled\b|\btradingEnabled\b/,
+    strength: "weak",
+  },
 ];
 
-const MINT_CAPABILITY_ROLE_PATTERNS = [
-  "minter_role",
-  "onlyminter",
-  "setminter",
-  "addminter",
+const MINT_CAPABILITY_MINT_PATTERNS: SignalPattern[] = [
+  { name: "mint", regex: /\bmint(ing)?\b/, strength: "strong" },
+  { name: "_mint", regex: /\b_mint\b/, strength: "strong" },
+  { name: "mintTo", regex: /\bmintTo\b/, strength: "strong" },
+  { name: "mint(address)", regex: /\bmint\s*\(\s*address\b/, strength: "strong" },
+  {
+    name: "increaseSupply",
+    regex: /\bincreaseSupply\b/,
+    strength: "strong",
+  },
+  {
+    name: "setMinter",
+    regex: /\bsetMinter\b|\bsetminter\b/,
+    strength: "strong",
+  },
 ];
 
-const TRADING_ENABLE_CONTROL_HIGH_PATTERNS = [
-  "pause",
-  "paused",
-  "unpause",
-  "disableTrading",
-  "stopTrading",
-  "resumeTrading",
+const MINT_CAPABILITY_ROLE_PATTERNS: SignalPattern[] = [
+  { name: "minter_role", regex: /\bminter_role\b/, strength: "weak" },
+  { name: "onlyminter", regex: /\bonlyminter\b/, strength: "weak" },
+  { name: "addminter", regex: /\baddminter\b/, strength: "weak" },
 ];
 
-const TRADING_ENABLE_CONTROL_WARN_PATTERNS = [
-  "tradingEnabled",
-  "enableTrading",
-  "setTrading",
-  "openTrading",
-  "tradingActive",
+const TRADING_ENABLE_CONTROL_HIGH_PATTERNS: SignalPattern[] = [
+  { name: "pause", regex: /\bpause(d)?\b/, strength: "strong" },
+  { name: "unpause", regex: /\bunpause(d)?\b/, strength: "strong" },
+  { name: "disableTrading", regex: /\bdisableTrading\b/, strength: "strong" },
+  { name: "stopTrading", regex: /\bstopTrading\b/, strength: "strong" },
+  { name: "resumeTrading", regex: /\bresumeTrading\b/, strength: "strong" },
+];
+
+const TRADING_ENABLE_CONTROL_WARN_PATTERNS: SignalPattern[] = [
+  {
+    name: "tradingEnabled",
+    regex: /\btrading\s*enabled\b|\btradingEnabled\b/,
+    strength: "weak",
+  },
+  { name: "enableTrading", regex: /\benableTrading\b/, strength: "weak" },
+  { name: "setTrading", regex: /\bsetTrading\b/, strength: "weak" },
+  { name: "openTrading", regex: /\bopenTrading\b/, strength: "weak" },
+  { name: "tradingActive", regex: /\btradingActive\b/, strength: "weak" },
 ];
 
 const buildExplorerAddressUrl = (
@@ -443,70 +476,41 @@ const buildExplorerAddressUrl = (
 };
 
 const buildSellRestrictionEvidence = (
-  matches: string[],
+  matches: ReturnType<typeof findSignals>,
+  preprocess: ReturnType<typeof preprocessSource>["removed"],
   reason?: string
 ): string[] => {
   if (reason) {
     return [`Source unavailable: ${reason}.`];
   }
 
-  if (matches.length > 0) {
-    return matches.map((match) => `Found "${match}" pattern.`);
-  }
-
-  return [
-    `Scanned for patterns: ${[
-      ...SELL_RESTRICTION_HIGH_PATTERNS,
-      ...SELL_RESTRICTION_WARN_PATTERNS,
-    ].join(", ")}.`,
-  ];
+  return [formatEvidence(matches, { preprocess })];
 };
 
 const buildOwnerPrivilegesEvidence = (
-  ownerMatches: string[],
-  changeMatches: string[],
+  ownerMatches: ReturnType<typeof findSignals>,
+  changeMatches: ReturnType<typeof findSignals>,
+  preprocess: ReturnType<typeof preprocessSource>["removed"],
   reason?: string
 ): string[] => {
   if (reason) {
     return [`Source unavailable: ${reason}.`];
   }
 
-  if (ownerMatches.length > 0 || changeMatches.length > 0) {
-    return [
-      ...ownerMatches.map((match) => `Found owner pattern: "${match}".`),
-      ...changeMatches.map((match) => `Found rule-change pattern: "${match}".`),
-    ];
-  }
-
-  return [
-    `Scanned for owner patterns: ${OWNER_PRIVILEGES_OWNER_PATTERNS.join(", ")}.`,
-    `Scanned for rule-change patterns: ${[
-      ...OWNER_PRIVILEGES_HIGH_PATTERNS,
-      ...OWNER_PRIVILEGES_WARN_PATTERNS,
-    ].join(", ")}.`,
-  ];
+  return [formatEvidence([...ownerMatches, ...changeMatches], { preprocess })];
 };
 
 const buildMintCapabilityEvidence = (
-  mintMatches: string[],
-  roleMatches: string[],
+  mintMatches: ReturnType<typeof findSignals>,
+  roleMatches: ReturnType<typeof findSignals>,
+  preprocess: ReturnType<typeof preprocessSource>["removed"],
   reason?: string
 ): string[] => {
   if (reason) {
     return [`Source unavailable: ${reason}.`];
   }
 
-  if (mintMatches.length > 0 || roleMatches.length > 0) {
-    return [
-      ...mintMatches.map((match) => `Found mint pattern: "${match}".`),
-      ...roleMatches.map((match) => `Found mint-role pattern: "${match}".`),
-    ];
-  }
-
-  return [
-    `Scanned for mint patterns: ${MINT_CAPABILITY_MINT_PATTERNS.join(", ")}.`,
-    `Scanned for mint-role patterns: ${MINT_CAPABILITY_ROLE_PATTERNS.join(", ")}.`,
-  ];
+  return [formatEvidence([...mintMatches, ...roleMatches], { preprocess })];
 };
 
 const buildSellRestrictionCheck = (
@@ -526,18 +530,18 @@ const buildSellRestrictionCheck = (
       result: "unknown",
       short: SELL_RESTRICTION_SHORT,
       detail: SELL_RESTRICTION_DETAIL,
-      evidence: buildSellRestrictionEvidence([], reason),
+      evidence: buildSellRestrictionEvidence(
+        [],
+        { comments: 0, strings: 0, failed: true },
+        reason
+      ),
       howToVerify: SELL_RESTRICTION_VERIFY_STEPS,
     };
   }
 
-  const sourceLower = sourceCode.toLowerCase();
-  const highMatches = SELL_RESTRICTION_HIGH_PATTERNS.filter((pattern) =>
-    sourceLower.includes(pattern.toLowerCase())
-  );
-  const warnMatches = SELL_RESTRICTION_WARN_PATTERNS.filter((pattern) =>
-    sourceLower.includes(pattern.toLowerCase())
-  );
+  const preprocessed = preprocessSource(sourceCode);
+  const highMatches = findSignals(preprocessed.cleaned, SELL_RESTRICTION_HIGH_PATTERNS);
+  const warnMatches = findSignals(preprocessed.cleaned, SELL_RESTRICTION_WARN_PATTERNS);
   const matches = [...highMatches, ...warnMatches];
 
   let result: SellRestrictionCheck["result"] = "ok";
@@ -553,7 +557,7 @@ const buildSellRestrictionCheck = (
     result,
     short: SELL_RESTRICTION_SHORT,
     detail: SELL_RESTRICTION_DETAIL,
-    evidence: buildSellRestrictionEvidence(matches),
+    evidence: buildSellRestrictionEvidence(matches, preprocessed.removed),
     howToVerify: SELL_RESTRICTION_VERIFY_STEPS,
   };
 };
@@ -575,20 +579,25 @@ const buildOwnerPrivilegesCheck = (
       result: "unknown",
       short: OWNER_PRIVILEGES_SHORT,
       detail: OWNER_PRIVILEGES_DETAIL,
-      evidence: buildOwnerPrivilegesEvidence([], [], reason),
+      evidence: buildOwnerPrivilegesEvidence(
+        [],
+        [],
+        { comments: 0, strings: 0, failed: true },
+        reason
+      ),
       howToVerify: OWNER_PRIVILEGES_VERIFY_STEPS,
     };
   }
 
-  const sourceLower = sourceCode.toLowerCase();
-  const ownerMatches = OWNER_PRIVILEGES_OWNER_PATTERNS.filter((pattern) =>
-    sourceLower.includes(pattern.toLowerCase())
+  const preprocessed = preprocessSource(sourceCode);
+  const ownerMatches = findSignals(preprocessed.cleaned, OWNER_PRIVILEGES_OWNER_PATTERNS);
+  const changeHighMatches = findSignals(
+    preprocessed.cleaned,
+    OWNER_PRIVILEGES_HIGH_PATTERNS
   );
-  const changeHighMatches = OWNER_PRIVILEGES_HIGH_PATTERNS.filter((pattern) =>
-    sourceLower.includes(pattern.toLowerCase())
-  );
-  const changeWarnMatches = OWNER_PRIVILEGES_WARN_PATTERNS.filter((pattern) =>
-    sourceLower.includes(pattern.toLowerCase())
+  const changeWarnMatches = findSignals(
+    preprocessed.cleaned,
+    OWNER_PRIVILEGES_WARN_PATTERNS
   );
   const changeMatches = [...changeHighMatches, ...changeWarnMatches];
 
@@ -605,7 +614,11 @@ const buildOwnerPrivilegesCheck = (
     result,
     short: OWNER_PRIVILEGES_SHORT,
     detail: OWNER_PRIVILEGES_DETAIL,
-    evidence: buildOwnerPrivilegesEvidence(ownerMatches, changeMatches),
+    evidence: buildOwnerPrivilegesEvidence(
+      ownerMatches,
+      changeMatches,
+      preprocessed.removed
+    ),
     howToVerify: OWNER_PRIVILEGES_VERIFY_STEPS,
   };
 };
@@ -627,18 +640,19 @@ const buildMintCapabilityCheck = (
       result: "unknown",
       short: MINT_CAPABILITY_SHORT,
       detail: MINT_CAPABILITY_DETAIL,
-      evidence: buildMintCapabilityEvidence([], [], reason),
+      evidence: buildMintCapabilityEvidence(
+        [],
+        [],
+        { comments: 0, strings: 0, failed: true },
+        reason
+      ),
       howToVerify: MINT_CAPABILITY_VERIFY_STEPS,
     };
   }
 
-  const sourceLower = sourceCode.toLowerCase();
-  const mintMatches = MINT_CAPABILITY_MINT_PATTERNS.filter((pattern) =>
-    sourceLower.includes(pattern.toLowerCase())
-  );
-  const roleMatches = MINT_CAPABILITY_ROLE_PATTERNS.filter((pattern) =>
-    sourceLower.includes(pattern.toLowerCase())
-  );
+  const preprocessed = preprocessSource(sourceCode);
+  const mintMatches = findSignals(preprocessed.cleaned, MINT_CAPABILITY_MINT_PATTERNS);
+  const roleMatches = findSignals(preprocessed.cleaned, MINT_CAPABILITY_ROLE_PATTERNS);
 
   let result: MintCapabilityCheck["result"] = "ok";
   if (mintMatches.length > 0 && roleMatches.length > 0) {
@@ -653,7 +667,11 @@ const buildMintCapabilityCheck = (
     result,
     short: MINT_CAPABILITY_SHORT,
     detail: MINT_CAPABILITY_DETAIL,
-    evidence: buildMintCapabilityEvidence(mintMatches, roleMatches),
+    evidence: buildMintCapabilityEvidence(
+      mintMatches,
+      roleMatches,
+      preprocessed.removed
+    ),
     howToVerify: MINT_CAPABILITY_VERIFY_STEPS,
   };
 };
@@ -775,23 +793,15 @@ const tradingEnableControlReason = (
 };
 
 const buildTradingEnableControlEvidence = (
-  matches: string[],
+  matches: ReturnType<typeof findSignals>,
+  preprocess: ReturnType<typeof preprocessSource>["removed"],
   reason?: ExplorerErrorCode | "source_unavailable"
 ): string[] => {
   if (reason) {
     return [`Source unavailable: ${reason}.`];
   }
 
-  if (matches.length > 0) {
-    return matches.map((match) => `Detected signal: ${match}`);
-  }
-
-  return [
-    `Scanned for patterns: ${[
-      ...TRADING_ENABLE_CONTROL_HIGH_PATTERNS,
-      ...TRADING_ENABLE_CONTROL_WARN_PATTERNS,
-    ].join(", ")}.`,
-  ];
+  return [formatEvidence(matches, { preprocess })];
 };
 
 const buildTradingEnableControlCheck = (
@@ -813,17 +823,23 @@ const buildTradingEnableControlCheck = (
       detail: `${TRADING_ENABLE_CONTROL_DETAIL} ${tradingEnableControlReason(
         reason
       )}`,
-      evidence: buildTradingEnableControlEvidence([], reason),
+      evidence: buildTradingEnableControlEvidence(
+        [],
+        { comments: 0, strings: 0, failed: true },
+        reason
+      ),
       howToVerify: TRADING_ENABLE_CONTROL_VERIFY_STEPS,
     };
   }
 
-  const sourceLower = sourceCode.toLowerCase();
-  const highMatches = TRADING_ENABLE_CONTROL_HIGH_PATTERNS.filter((pattern) =>
-    sourceLower.includes(pattern.toLowerCase())
+  const preprocessed = preprocessSource(sourceCode);
+  const highMatches = findSignals(
+    preprocessed.cleaned,
+    TRADING_ENABLE_CONTROL_HIGH_PATTERNS
   );
-  const warnMatches = TRADING_ENABLE_CONTROL_WARN_PATTERNS.filter((pattern) =>
-    sourceLower.includes(pattern.toLowerCase())
+  const warnMatches = findSignals(
+    preprocessed.cleaned,
+    TRADING_ENABLE_CONTROL_WARN_PATTERNS
   );
   const matches = [...highMatches, ...warnMatches];
 
@@ -840,7 +856,7 @@ const buildTradingEnableControlCheck = (
     result,
     short: TRADING_ENABLE_CONTROL_SHORT,
     detail: TRADING_ENABLE_CONTROL_DETAIL,
-    evidence: buildTradingEnableControlEvidence(matches),
+    evidence: buildTradingEnableControlEvidence(matches, preprocessed.removed),
     howToVerify: TRADING_ENABLE_CONTROL_VERIFY_STEPS,
   };
 };

@@ -3,71 +3,79 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Owner privileges | Token Scam Inspector</title>
-    <meta name="description" content="Owner privileges（オーナー権限）シグナルの意味、注意点、確認手順を中立に整理します。">
+    <title data-i18n="signal.ownerPrivileges.title">Owner privileges | Token Scam Inspector</title>
+    <meta name="description" data-i18n-attr="content" data-i18n="signal.ownerPrivileges.description" content="Owner privileges（所有者権限）シグナルの意味、注意点、確認手順を初心者向けに説明します。">
     <link rel="stylesheet" href="../../style.css">
   </head>
   <body>
     <main class="container">
       <header class="page-header">
-        <h1>Owner privileges</h1>
-        <p class="subtitle">開発者や管理者が重要な設定を変更できる可能性を示すシグナルです。</p>
+        <h1 data-i18n="signal.ownerPrivileges.heading">Owner privileges</h1>
+        <p class="subtitle" data-i18n="signal.ownerPrivileges.subtitle">所有者が強い権限を持っている可能性を示すシグナルです。</p>
+        <div class="lang-toggle" role="group" data-i18n-attr="aria-label" data-i18n="lang.toggle.label" aria-label="Language">
+          <button type="button" class="lang-toggle-button" data-lang-switch="ja" data-i18n="lang.toggle.ja">JA</button>
+          <span class="lang-toggle-separator" aria-hidden="true">/</span>
+          <button type="button" class="lang-toggle-button" data-lang-switch="en" data-i18n="lang.toggle.en">EN</button>
+        </div>
       </header>
 
       <section class="signal-section" aria-labelledby="meaning-heading">
-        <h2 id="meaning-heading">1) Meaning</h2>
+        <h2 id="meaning-heading" data-i18n="signals.sections.meaning">1) Meaning</h2>
         <p>
-          Owner privilegesは、オーナー（または特定ロール）が取引条件や手数料などを変更できる設計を示します。
-          今は問題がなくても、あとから条件が変わる余地を表します。
+          Owner privilegesは、ownerや管理ロールが重要なパラメータを変更できる可能性を示します。
+          具体的には、税率、取引可否、除外リストなどを後から変えられる設計が対象になります。
         </p>
       </section>
 
       <section class="signal-section" aria-labelledby="why-heading">
-        <h2 id="why-heading">2) Why it matters</h2>
+        <h2 id="why-heading" data-i18n="signals.sections.why">2) Why it matters</h2>
         <p>
-          強い権限が残っていると、ユーザーに不利な変更が可能になります。
-          変更の有無や範囲が読み取りづらいと、リスク判断が難しくなります。
+          所有者権限が強いと、ルールが後から変わるリスクがあります。
+          たとえ今は問題がなくても、将来的に条件が厳しくなる可能性を否定できません。
         </p>
       </section>
 
       <section class="signal-section" aria-labelledby="legit-heading">
-        <h2 id="legit-heading">3) Common legit reasons</h2>
+        <h2 id="legit-heading" data-i18n="signals.sections.legit">3) Common legit reasons</h2>
         <ul>
-          <li>ローンチ直後の調整のために一時的に権限を残している</li>
-          <li>マルチシグやTimelockで運用されている</li>
-          <li>権限はあるが、対象が限定的で説明が明確</li>
+          <li>ローンチ直後に段階的な調整が必要なケース</li>
+          <li>悪用対策として一時的に制御権を残すケース</li>
+          <li>マルチシグやDAOに段階的に移行する前提のケース</li>
         </ul>
       </section>
 
       <section class="signal-section" aria-labelledby="verify-heading">
-        <h2 id="verify-heading">4) How to verify</h2>
+        <h2 id="verify-heading" data-i18n="signals.sections.how">4) How to verify</h2>
         <ul>
-          <li>エクスプローラーのContract / Read / Writeを確認する</li>
-          <li>ownerやroleのアドレスが誰かを追跡する</li>
-          <li>権限変更（transferOwnership / renounce）履歴があるかを見る</li>
-          <li>公式ドキュメントに権限設計の説明があるか確認する</li>
+          <li>エクスプローラーのCodeでowner/role関連の関数を確認する</li>
+          <li>Ownershipが放棄済み（renounced）かどうかを確認する</li>
+          <li>権限の対象が何か（税率、制限、ブラックリスト等）を特定する</li>
+          <li>運営の説明と実装が一致しているかを比較する</li>
         </ul>
       </section>
 
       <section class="signal-section" aria-labelledby="limits-heading">
-        <h2 id="limits-heading">5) What this tool can/can’t detect</h2>
+        <h2 id="limits-heading" data-i18n="signals.sections.limits">5) What this tool can/can’t detect</h2>
         <p>
-          このツールは、権限を示すパターンの有無を検出します。
-          ただし、実際の運用体制（誰が鍵を持つか、どう承認されるか）までは判断できません。
+          このツールは、公開コードや設定から権限の兆候を探します。
+          ただし、実際の運用体制（誰が鍵を持っているか等）までは保証できません。
         </p>
         <ul>
-          <li>検出できること：ownerや強い権限関数の存在</li>
-          <li>検出が難しいこと：運用ルールやオフチェーンの合意</li>
+          <li>検出できること：権限を示す関数やロールの存在</li>
+          <li>検出が難しいこと：運用上の統制や例外的な権限移譲</li>
         </ul>
       </section>
 
       <section class="signal-section" aria-labelledby="links-heading">
-        <h2 id="links-heading">6) Links</h2>
+        <h2 id="links-heading" data-i18n="signals.sections.links">6) Links</h2>
         <p class="back-links">
-          <a href="../../">Back to results</a>
-          <a href="../../guide/">Back to guide</a>
+          <a href="../../" data-i18n="signals.back">Back to results</a>
+          <a href="../../guide/" data-i18n="signals.guide">Back to guide</a>
         </p>
       </section>
     </main>
+    <script src="../../assets/i18n/ja.js"></script>
+    <script src="../../assets/i18n/en.js"></script>
+    <script src="../../assets/i18n.js"></script>
   </body>
 </html>

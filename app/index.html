@@ -24,46 +24,65 @@
         <button id="inspect-button" type="submit">Inspect</button>
       </form>
 
-      <p class="status" id="status">Idle.</p>
+      <p class="status" id="status" role="status">Enter a contract address to begin.</p>
 
-      <section class="results">
-        <h2>Result</h2>
+      <section class="results" aria-live="polite">
+        <p id="unknown-note" class="note unknown-note">
+          unknown = 確認できなかった（安全を意味しない）
+        </p>
+
+        <p id="cache-hint" class="cache-hint" hidden></p>
+
         <div id="result-error" class="error-box" hidden></div>
-        <div class="summary-grid">
-          <div>
-            <h3>Overall risk</h3>
-            <p>
-              <span id="summary-overall-risk">unknown</span>
-              <span id="summary-overall-badge" class="badge badge-unknown">unknown</span>
-            </p>
-          </div>
-          <div>
-            <h3>Summary</h3>
-            <p id="summary-text">No inspection yet.</p>
-          </div>
-          <div>
-            <h3>Top reasons</h3>
-            <ul id="summary-top-reasons">
+
+        <div id="empty-state" class="state-block">
+          <h2>How to use</h2>
+          <p>Choose a chain, paste the token contract address, and press Inspect.</p>
+          <p class="example">Example: 0x0000000000000000000000000000000000000000</p>
+        </div>
+
+        <div id="loading-state" class="state-block" hidden>
+          <h2>Inspecting</h2>
+          <p class="loading-line">Inspecting token… Cached results may be used.</p>
+        </div>
+
+        <div id="success-state" hidden>
+          <section class="result-block" aria-labelledby="overall-heading">
+            <h2 id="overall-heading">Overall</h2>
+            <div class="overall-row">
+              <span id="overall-badge" class="badge badge-unknown">unknown</span>
+              <p id="overall-summary" class="overall-summary">No inspection yet.</p>
+            </div>
+          </section>
+
+          <section class="result-block" aria-labelledby="reasons-heading">
+            <h2 id="reasons-heading">Top reasons</h2>
+            <ul id="top-reasons" class="reasons-list">
               <li>No top reasons available.</li>
             </ul>
-          </div>
-          <div>
-            <h3>Cached</h3>
-            <p id="cache-status">Cached: unknown</p>
-          </div>
+          </section>
+
+          <section class="result-block" aria-labelledby="checks-heading">
+            <h2 id="checks-heading">Checks</h2>
+            <ul id="checks-list" class="checks-list">
+              <li class="check-row">No checks available.</li>
+            </ul>
+          </section>
+
+          <section class="result-block" aria-labelledby="details-heading">
+            <h2 id="details-heading">Details</h2>
+            <div id="check-details" class="details-list">
+              <p>No details available.</p>
+            </div>
+          </section>
         </div>
-      </section>
 
-      <section class="results">
-        <h2>Checks</h2>
-        <ul id="checks-list">
-          <li>No checks available.</li>
-        </ul>
-      </section>
-
-      <section class="results">
-        <h2>Raw JSON</h2>
-        <pre><code id="result">{}</code></pre>
+        <div id="raw-json-block" class="result-block raw-json" hidden>
+          <details>
+            <summary>Raw JSON</summary>
+            <pre><code id="result">{}</code></pre>
+          </details>
+        </div>
       </section>
 
       <p class="note">This tool shows risk signals with explanations. Not a verdict.</p>

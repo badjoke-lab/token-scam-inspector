@@ -1,5 +1,10 @@
 import { fetchExplorerFacts } from "./explorer/client";
-import type { Chain, ExplorerFacts, ExplorerValue } from "./explorer/types";
+import type {
+  Chain,
+  ExplorerErrorCode,
+  ExplorerFacts,
+  ExplorerValue,
+} from "./explorer/types";
 import {
   InspectRouteError,
   type InspectError,
@@ -10,6 +15,11 @@ import {
 import { findSignals, formatEvidence, preprocessSource, type SignalPattern } from "./utils/sourceScan";
 import { fetchTokenIdentity } from "./providers/tokenIdentity";
 import type { TokenIdentityResult } from "./providers/tokenIdentityTypes";
+import {
+  collectAbiFunctionEvidence,
+  extractAbiSignals,
+  type AbiSignals,
+} from "./utils/abiSignals";
 
 const jsonResponse = (body: unknown, init?: ResponseInit): Response => {
   const headers = new Headers(init?.headers);
@@ -483,6 +493,99 @@ const buildExplorerAddressUrl = (
   return `${baseUrl}${address}#code`;
 };
 
+type UnknownReason = "no_abi" | "unverified" | "rate_limited" | "upstream_error" | "parse_failed";
+
+const mapExplorerErrorToUnknownReason = (
+  code?: ExplorerErrorCode
+): UnknownReason | null => {
+  if (!code) {
+    return null;
+  }
+  if (code === "rate_limited") {
+    return "rate_limited";
+  }
+  if (code === "upstream_error" || code === "timeout") {
+    return "upstream_error";
+  }
+  return "upstream_error";
+};
+
+const determineUnknownReason = (
+  sourceFacts?: ExplorerFacts["source"]
+): UnknownReason => {
+  if (!sourceFacts) {
+    return "upstream_error";
+  }
+
+  if (sourceFacts.data.abiParseFailed) {
+    return "parse_failed";
+  }
+
+  const fromError = mapExplorerErrorToUnknownReason(sourceFacts.error?.code);
+  if (fromError) {
+    return fromError;
+  }
+
+  if (sourceFacts.data.sourceAvailable === false) {
+    return "unverified";
+  }
+
+  if (sourceFacts.data.abiAvailable === false) {
+    return "no_abi";
+  }
+
+  return "upstream_error";
+};
+
+const summarizeSignalMatches = (
+  matches: ReturnType<typeof findSignals>,
+  limit = 5
+): string[] => {
+  const summary: string[] = [];
+  for (const match of matches) {
+    if (!summary.includes(match.name)) {
+      summary.push(match.name);
+    }
+    if (summary.length >= limit) {
+      break;
+    }
+  }
+  return summary;
+};
+
+const buildVerifiedSourceEvidence = (
+  matches: ReturnType<typeof findSignals>,
+  preprocess: ReturnType<typeof preprocessSource>["removed"]
+): string[] => {
+  const signalLine = "Signal: VerifiedSource.";
+  const functions = summarizeSignalMatches(matches);
+  const functionsLine =
+    functions.length > 0
+      ? `Verified source signals: ${functions.map((name) => `${name}()`).join(", ")} found.`
+      : "Verified source signals: none detected.";
+  const preprocessLine = preprocess.failed
+    ? "Preprocess: failed (fallback raw) via sourceScan."
+    : "Preprocess: comments/strings removed via sourceScan.";
+  return [signalLine, functionsLine, preprocessLine];
+};
+
+const buildAbiSignalEvidence = (
+  signals: AbiSignals,
+  keys: Array<keyof AbiSignals["matchedBySignal"]>
+): string[] => {
+  const functions = collectAbiFunctionEvidence(signals, keys);
+  const functionsLine =
+    functions.length > 0
+      ? `ABI signal: ${functions.map((name) => `${name}()`).join(", ")} found.`
+      : "ABI signal: none detected.";
+  return ["Signal: ABI.", functionsLine];
+};
+
+const buildAbiUnavailableEvidence = (reason: UnknownReason): string[] => [
+  "Signal: ABI (unavailable).",
+  `Reason: ${reason}.`,
+];
+
 const buildSellRestrictionEvidence = (
   matches: ReturnType<typeof findSignals>,
   preprocess: ReturnType<typeof preprocessSource>["removed"],
@@ -499,26 +602,26 @@ const buildOwnerPrivilegesEvidence = (
   ownerMatches: ReturnType<typeof findSignals>,
   changeMatches: ReturnType<typeof findSignals>,
   preprocess: ReturnType<typeof preprocessSource>["removed"],
-  reason?: string
+  reason?: UnknownReason
 ): string[] => {
   if (reason) {
-    return [`Source unavailable: ${reason}.`];
+    return buildAbiUnavailableEvidence(reason);
   }
 
-  return [formatEvidence([...ownerMatches, ...changeMatches], { preprocess })];
+  return buildVerifiedSourceEvidence([...ownerMatches, ...changeMatches], preprocess);
 };
 
 const buildMintCapabilityEvidence = (
   mintMatches: ReturnType<typeof findSignals>,
   roleMatches: ReturnType<typeof findSignals>,
   preprocess: ReturnType<typeof preprocessSource>["removed"],
-  reason?: string
+  reason?: UnknownReason
 ): string[] => {
   if (reason) {
-    return [`Source unavailable: ${reason}.`];
+    return buildAbiUnavailableEvidence(reason);
   }
 
-  return [formatEvidence([...mintMatches, ...roleMatches], { preprocess })];
+  return buildVerifiedSourceEvidence([...mintMatches, ...roleMatches], preprocess);
 };
 
 const buildSellRestrictionCheck = (
@@ -576,56 +679,82 @@ const buildOwnerPrivilegesCheck = (
   const sourceFacts = explorerFacts?.source;
   const sourceStatus = sourceFacts?.data.sourceAvailable;
   const sourceCode = sourceFacts?.data.sourceCode ?? "";
+  const abiAvailable = sourceFacts?.data.abiAvailable === true;
+  const abi = sourceFacts?.data.abi ?? [];
 
-  if (sourceStatus !== true || sourceCode.trim() === "") {
-    const reason =
-      sourceFacts?.error?.code ??
-      (sourceStatus === false ? "source_unavailable" : "source_unavailable");
+  if (sourceStatus === true && sourceCode.trim() !== "") {
+    const preprocessed = preprocessSource(sourceCode);
+    const ownerMatches = findSignals(preprocessed.cleaned, OWNER_PRIVILEGES_OWNER_PATTERNS);
+    const changeHighMatches = findSignals(
+      preprocessed.cleaned,
+      OWNER_PRIVILEGES_HIGH_PATTERNS
+    );
+    const changeWarnMatches = findSignals(
+      preprocessed.cleaned,
+      OWNER_PRIVILEGES_WARN_PATTERNS
+    );
+    const changeMatches = [...changeHighMatches, ...changeWarnMatches];
+
+    let result: OwnerPrivilegesCheck["result"] = "ok";
+    if (ownerMatches.length > 0 && changeHighMatches.length > 0) {
+      result = "high";
+    } else if (ownerMatches.length > 0 && changeWarnMatches.length > 0) {
+      result = "warn";
+    }
+
     return {
       id: "owner_privileges",
       label: "Owner Privileges",
-      result: "unknown",
+      result,
       short: OWNER_PRIVILEGES_SHORT,
       detail: OWNER_PRIVILEGES_DETAIL,
       evidence: buildOwnerPrivilegesEvidence(
-        [],
-        [],
-        { comments: 0, strings: 0, failed: true },
-        reason
+        ownerMatches,
+        changeMatches,
+        preprocessed.removed
       ),
       howToVerify: OWNER_PRIVILEGES_VERIFY_STEPS,
     };
   }
 
-  const preprocessed = preprocessSource(sourceCode);
-  const ownerMatches = findSignals(preprocessed.cleaned, OWNER_PRIVILEGES_OWNER_PATTERNS);
-  const changeHighMatches = findSignals(
-    preprocessed.cleaned,
-    OWNER_PRIVILEGES_HIGH_PATTERNS
-  );
-  const changeWarnMatches = findSignals(
-    preprocessed.cleaned,
-    OWNER_PRIVILEGES_WARN_PATTERNS
-  );
-  const changeMatches = [...changeHighMatches, ...changeWarnMatches];
+  if (abiAvailable) {
+    const abiSignals = extractAbiSignals(abi);
+    const ownerSetterNames = abiSignals.matchedBySignal.ownerSetter.map((name) =>
+      name.toLowerCase()
+    );
+    const hasStrongOwnerSetter = ownerSetterNames.some((name) => name.includes("setowner"));
+    const strongSignals = Number(hasStrongOwnerSetter) + Number(abiSignals.hasMinterRole);
 
-  let result: OwnerPrivilegesCheck["result"] = "ok";
-  if (ownerMatches.length > 0 && changeHighMatches.length > 0) {
-    result = "high";
-  } else if (ownerMatches.length > 0 && changeWarnMatches.length > 0) {
-    result = "warn";
+    let result: OwnerPrivilegesCheck["result"] = "ok";
+    if (strongSignals >= 2) {
+      result = "high";
+    } else if (abiSignals.hasOwnerSetter || abiSignals.hasMinterRole) {
+      result = "warn";
+    }
+
+    return {
+      id: "owner_privileges",
+      label: "Owner Privileges",
+      result,
+      short: OWNER_PRIVILEGES_SHORT,
+      detail: OWNER_PRIVILEGES_DETAIL,
+      evidence: buildAbiSignalEvidence(abiSignals, ["ownerSetter", "minterRole"]),
+      howToVerify: OWNER_PRIVILEGES_VERIFY_STEPS,
+    };
   }
 
+  const reason = determineUnknownReason(sourceFacts);
   return {
     id: "owner_privileges",
     label: "Owner Privileges",
-    result,
+    result: "unknown",
     short: OWNER_PRIVILEGES_SHORT,
     detail: OWNER_PRIVILEGES_DETAIL,
     evidence: buildOwnerPrivilegesEvidence(
-      ownerMatches,
-      changeMatches,
-      preprocessed.removed
+      [],
+      [],
+      { comments: 0, strings: 0, failed: true },
+      reason
     ),
     howToVerify: OWNER_PRIVILEGES_VERIFY_STEPS,
   };
@@ -637,48 +766,70 @@ const buildMintCapabilityCheck = (
   const sourceFacts = explorerFacts?.source;
   const sourceStatus = sourceFacts?.data.sourceAvailable;
   const sourceCode = sourceFacts?.data.sourceCode ?? "";
+  const abiAvailable = sourceFacts?.data.abiAvailable === true;
+  const abi = sourceFacts?.data.abi ?? [];
 
-  if (sourceStatus !== true || sourceCode.trim() === "") {
-    const reason =
-      sourceFacts?.error?.code ??
-      (sourceStatus === false ? "source_unavailable" : "source_unavailable");
+  if (sourceStatus === true && sourceCode.trim() !== "") {
+    const preprocessed = preprocessSource(sourceCode);
+    const mintMatches = findSignals(preprocessed.cleaned, MINT_CAPABILITY_MINT_PATTERNS);
+    const roleMatches = findSignals(preprocessed.cleaned, MINT_CAPABILITY_ROLE_PATTERNS);
+
+    let result: MintCapabilityCheck["result"] = "ok";
+    if (mintMatches.length > 0 && roleMatches.length > 0) {
+      result = "high";
+    } else if (mintMatches.length > 0 || roleMatches.length > 0) {
+      result = "warn";
+    }
+
     return {
       id: "mint_capability",
       label: "Mint Capability",
-      result: "unknown",
+      result,
       short: MINT_CAPABILITY_SHORT,
       detail: MINT_CAPABILITY_DETAIL,
       evidence: buildMintCapabilityEvidence(
-        [],
-        [],
-        { comments: 0, strings: 0, failed: true },
-        reason
+        mintMatches,
+        roleMatches,
+        preprocessed.removed
       ),
       howToVerify: MINT_CAPABILITY_VERIFY_STEPS,
     };
   }
 
-  const preprocessed = preprocessSource(sourceCode);
-  const mintMatches = findSignals(preprocessed.cleaned, MINT_CAPABILITY_MINT_PATTERNS);
-  const roleMatches = findSignals(preprocessed.cleaned, MINT_CAPABILITY_ROLE_PATTERNS);
+  if (abiAvailable) {
+    const abiSignals = extractAbiSignals(abi);
+    const strongSignals = Number(abiSignals.hasMint) + Number(abiSignals.hasMinterRole);
 
-  let result: MintCapabilityCheck["result"] = "ok";
-  if (mintMatches.length > 0 && roleMatches.length > 0) {
-    result = "high";
-  } else if (mintMatches.length > 0 || roleMatches.length > 0) {
-    result = "warn";
+    let result: MintCapabilityCheck["result"] = "ok";
+    if (strongSignals >= 2) {
+      result = "high";
+    } else if (abiSignals.hasMint || abiSignals.hasMinterRole) {
+      result = "warn";
+    }
+
+    return {
+      id: "mint_capability",
+      label: "Mint Capability",
+      result,
+      short: MINT_CAPABILITY_SHORT,
+      detail: MINT_CAPABILITY_DETAIL,
+      evidence: buildAbiSignalEvidence(abiSignals, ["mint", "minterRole"]),
+      howToVerify: MINT_CAPABILITY_VERIFY_STEPS,
+    };
   }
 
+  const reason = determineUnknownReason(sourceFacts);
   return {
     id: "mint_capability",
     label: "Mint Capability",
-    result,
+    result: "unknown",
     short: MINT_CAPABILITY_SHORT,
     detail: MINT_CAPABILITY_DETAIL,
     evidence: buildMintCapabilityEvidence(
-      mintMatches,
-      roleMatches,
-      preprocessed.removed
+      [],
+      [],
+      { comments: 0, strings: 0, failed: true },
+      reason
     ),
     howToVerify: MINT_CAPABILITY_VERIFY_STEPS,
   };
@@ -778,38 +929,32 @@ const buildHolderConcentrationCheck = (
   };
 };
 
-const tradingEnableControlReason = (
-  code?: ExplorerErrorCode | "source_unavailable"
-): string => {
-  switch (code) {
-    case "missing_api_key":
-      return "Explorer API key is missing for contract source data.";
+const tradingEnableControlReason = (reason: UnknownReason): string => {
+  switch (reason) {
+    case "unverified":
+      return "Verified source could not be confirmed.";
+    case "no_abi":
+      return "ABI was not available from the explorer.";
+    case "parse_failed":
+      return "ABI data could not be parsed.";
     case "rate_limited":
-      return "Explorer rate limit blocked contract source retrieval.";
-    case "not_supported":
-      return "Explorer does not support contract source on this chain.";
-    case "timeout":
-      return "Explorer request timed out while fetching contract source data.";
-    case "unavailable_on_free_plan":
-      return "Contract source data is unavailable on the free explorer plan.";
-    case "source_unavailable":
-      return "Verified source code is unavailable.";
+      return "Explorer rate limits blocked ABI or source retrieval.";
     case "upstream_error":
     default:
-      return "Explorer contract source data could not be retrieved.";
+      return "Explorer contract data could not be retrieved.";
   }
 };
 
 const buildTradingEnableControlEvidence = (
   matches: ReturnType<typeof findSignals>,
   preprocess: ReturnType<typeof preprocessSource>["removed"],
-  reason?: ExplorerErrorCode | "source_unavailable"
+  reason?: UnknownReason
 ): string[] => {
   if (reason) {
-    return [`Source unavailable: ${reason}.`];
+    return buildAbiUnavailableEvidence(reason);
   }
 
-  return [formatEvidence(matches, { preprocess })];
+  return buildVerifiedSourceEvidence(matches, preprocess);
 };
 
 const buildTradingEnableControlCheck = (
@@ -818,53 +963,86 @@ const buildTradingEnableControlCheck = (
   const sourceFacts = explorerFacts?.source;
   const sourceStatus = sourceFacts?.data.sourceAvailable;
   const sourceCode = sourceFacts?.data.sourceCode ?? "";
+  const abiAvailable = sourceFacts?.data.abiAvailable === true;
+  const abi = sourceFacts?.data.abi ?? [];
 
-  if (sourceStatus !== true || sourceCode.trim() === "") {
-    const reason =
-      sourceFacts?.error?.code ??
-      (sourceStatus === false ? "source_unavailable" : "source_unavailable");
+  if (sourceStatus === true && sourceCode.trim() !== "") {
+    const preprocessed = preprocessSource(sourceCode);
+    const highMatches = findSignals(
+      preprocessed.cleaned,
+      TRADING_ENABLE_CONTROL_HIGH_PATTERNS
+    );
+    const warnMatches = findSignals(
+      preprocessed.cleaned,
+      TRADING_ENABLE_CONTROL_WARN_PATTERNS
+    );
+    const matches = [...highMatches, ...warnMatches];
+
+    let result: TradingEnableControlCheck["result"] = "ok";
+    if (highMatches.length > 0) {
+      result = "high";
+    } else if (warnMatches.length > 0) {
+      result = "warn";
+    }
+
     return {
       id: "trading_enable_control",
       label: "Trading Enable Control",
-      result: "unknown",
+      result,
       short: TRADING_ENABLE_CONTROL_SHORT,
-      detail: `${TRADING_ENABLE_CONTROL_DETAIL} ${tradingEnableControlReason(
-        reason
-      )}`,
-      evidence: buildTradingEnableControlEvidence(
-        [],
-        { comments: 0, strings: 0, failed: true },
-        reason
-      ),
+      detail: TRADING_ENABLE_CONTROL_DETAIL,
+      evidence: buildTradingEnableControlEvidence(matches, preprocessed.removed),
       howToVerify: TRADING_ENABLE_CONTROL_VERIFY_STEPS,
     };
   }
 
-  const preprocessed = preprocessSource(sourceCode);
-  const highMatches = findSignals(
-    preprocessed.cleaned,
-    TRADING_ENABLE_CONTROL_HIGH_PATTERNS
-  );
-  const warnMatches = findSignals(
-    preprocessed.cleaned,
-    TRADING_ENABLE_CONTROL_WARN_PATTERNS
-  );
-  const matches = [...highMatches, ...warnMatches];
+  if (abiAvailable) {
+    const abiSignals = extractAbiSignals(abi);
+    const tradingNames = abiSignals.matchedBySignal.tradingEnableToggle.map((name) =>
+      name.toLowerCase()
+    );
+    const hasEnableToggle = tradingNames.some(
+      (name) => name.includes("enabletrading") || name.includes("opentrading")
+    );
+    const hasDisableToggle = tradingNames.some((name) => name.includes("disabletrading"));
+    const hasTogglePair = hasEnableToggle && hasDisableToggle;
+    const hasPausePair = abiSignals.hasPause && abiSignals.hasUnpause;
+    const strongSignals = Number(hasPausePair) + Number(hasTogglePair);
 
-  let result: TradingEnableControlCheck["result"] = "ok";
-  if (highMatches.length > 0) {
-    result = "high";
-  } else if (warnMatches.length > 0) {
-    result = "warn";
+    let result: TradingEnableControlCheck["result"] = "ok";
+    if (strongSignals >= 2) {
+      result = "high";
+    } else if (abiSignals.hasPause || abiSignals.hasUnpause || abiSignals.hasTradingEnableToggle) {
+      result = "warn";
+    }
+
+    return {
+      id: "trading_enable_control",
+      label: "Trading Enable Control",
+      result,
+      short: TRADING_ENABLE_CONTROL_SHORT,
+      detail: TRADING_ENABLE_CONTROL_DETAIL,
+      evidence: buildAbiSignalEvidence(abiSignals, [
+        "pause",
+        "unpause",
+        "tradingEnableToggle",
+      ]),
+      howToVerify: TRADING_ENABLE_CONTROL_VERIFY_STEPS,
+    };
   }
 
+  const reason = determineUnknownReason(sourceFacts);
   return {
     id: "trading_enable_control",
     label: "Trading Enable Control",
-    result,
+    result: "unknown",
     short: TRADING_ENABLE_CONTROL_SHORT,
-    detail: TRADING_ENABLE_CONTROL_DETAIL,
-    evidence: buildTradingEnableControlEvidence(matches, preprocessed.removed),
+    detail: `${TRADING_ENABLE_CONTROL_DETAIL} ${tradingEnableControlReason(reason)}`,
+    evidence: buildTradingEnableControlEvidence(
+      [],
+      { comments: 0, strings: 0, failed: true },
+      reason
+    ),
     howToVerify: TRADING_ENABLE_CONTROL_VERIFY_STEPS,
   };
 };

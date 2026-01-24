@@ -27,6 +27,9 @@ export interface ContractSourceFacts {
   sourceAvailable: ExplorerValue;
   isProxy: ExplorerValue;
   sourceCode: string;
+  abiAvailable: ExplorerValue;
+  abi: unknown[];
+  abiParseFailed: boolean;
 }
 
 export interface ContractCreationFacts {

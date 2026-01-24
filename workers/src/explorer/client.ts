@@ -16,6 +16,9 @@ const unknownSourceFacts: ContractSourceFacts = {
   sourceAvailable: "unknown",
   isProxy: "unknown",
   sourceCode: "",
+  abiAvailable: "unknown",
+  abi: [],
+  abiParseFailed: false,
 };
 
 const unknownCreationFacts: ContractCreationFacts = {
@@ -157,6 +160,40 @@ const createMissingKeyError = (): ExplorerError => ({
   upstream: "etherscan",
 });
 
+const ABI_UNVERIFIED_MARKERS = ["contract source code not verified", "not verified"];
+
+const parseAbiFromExplorer = (abiRaw: string): Pick<
+  ContractSourceFacts,
+  "abiAvailable" | "abi" | "abiParseFailed"
+> => {
+  const trimmed = abiRaw.trim();
+  if (trimmed === "") {
+    return { abiAvailable: false, abi: [], abiParseFailed: false };
+  }
+
+  const lowered = trimmed.toLowerCase();
+  if (ABI_UNVERIFIED_MARKERS.some((marker) => lowered.includes(marker))) {
+    return { abiAvailable: false, abi: [], abiParseFailed: false };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch (_error) {
+    return { abiAvailable: "unknown", abi: [], abiParseFailed: true };
+  }
+
+  if (!Array.isArray(parsed)) {
+    return { abiAvailable: "unknown", abi: [], abiParseFailed: true };
+  }
+
+  return {
+    abiAvailable: parsed.length > 0,
+    abi: parsed,
+    abiParseFailed: false,
+  };
+};
+
 const getContractSourceFacts = async (
   chain: Chain,
   address: string,
@@ -201,9 +238,12 @@ const getContractSourceFacts = async (
   const entry = parsed.result[0] as {
     SourceCode?: string;
     Proxy?: string;
+    ABI?: string;
   };
   const sourceCode = typeof entry?.SourceCode === "string" ? entry.SourceCode : "";
   const proxyFlag = entry?.Proxy;
+  const abiRaw = typeof entry?.ABI === "string" ? entry.ABI : "";
+  const abiFacts = parseAbiFromExplorer(abiRaw);
 
   return {
     data: {
@@ -211,6 +251,9 @@ const getContractSourceFacts = async (
       isProxy:
         proxyFlag === "1" ? true : proxyFlag === "0" ? false : "unknown",
       sourceCode,
+      abiAvailable: abiFacts.abiAvailable,
+      abi: abiFacts.abi,
+      abiParseFailed: abiFacts.abiParseFailed,
     },
   };
 };

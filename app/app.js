@@ -32,6 +32,16 @@ const COPY_FEEDBACK_MS = 2000;
 
 const ALLOWED_CHAINS = new Set(["eth", "bsc"]);
 const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
+const SIGNAL_SLUG_BY_ID = {
+  sell_restriction: "sell-restriction",
+  owner_privileges: "owner-privileges",
+  mint_capability: "mint-capability",
+  liquidity_lock: "liquidity-lock",
+  holder_concentration: "holder-concentration",
+  contract_verification: "contract-verification",
+  trading_control: "trading-control",
+  trading_enable_control: "trading-control",
+};
 
 let isLoading = false;
 let copyFeedbackTimerId = null;
@@ -186,6 +196,17 @@ const createList = (items) => {
   return list;
 };
 
+const getSignalHref = (checkId) => {
+  if (!checkId) {
+    return "";
+  }
+  const slug = SIGNAL_SLUG_BY_ID[checkId];
+  if (!slug) {
+    return "";
+  }
+  return `./signals/${slug}/`;
+};
+
 const renderChecks = (checks) => {
   clearChildren(checksList);
   clearChildren(checkDetails);
@@ -206,6 +227,7 @@ const renderChecks = (checks) => {
 
   limitedChecks.forEach((check) => {
     const labelText = check.label || "Unnamed check";
+    const signalHref = getSignalHref(check.id);
 
     const row = document.createElement("li");
     row.className = "check-row";
@@ -225,6 +247,17 @@ const renderChecks = (checks) => {
       shortText.className = "check-row-short";
       shortText.textContent = check.short;
       row.appendChild(shortText);
+    }
+
+    if (signalHref) {
+      const links = document.createElement("p");
+      links.className = "check-row-links";
+      const learnMoreLink = document.createElement("a");
+      learnMoreLink.href = signalHref;
+      learnMoreLink.className = "learn-more-link";
+      learnMoreLink.textContent = "Learn more";
+      links.appendChild(learnMoreLink);
+      row.appendChild(links);
     }
 
     checksList.appendChild(row);

@@ -19,6 +19,18 @@ body {
   margin-top: 8px;
 }
 
+.page-nav-list {
+  list-style: none;
+  margin: 12px 0 4px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.page-nav a {
+  display: inline-block;
+}
+
 .form {
   display: grid;
   gap: 12px;
@@ -53,6 +65,17 @@ button:disabled {
 .result-block {
   display: grid;
   gap: 8px;
+}
+
+.note-block {
+  margin: 0;
+}
+
+.dictionary-list {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
 }
 
 .state-block {
@@ -132,6 +155,15 @@ button:disabled {
   flex: 1 1 100%;
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.check-row-links {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+.learn-more-link {
+  display: inline-block;
 }
 
 .details-list {
@@ -215,4 +247,31 @@ details summary:focus {
 
 .note {
   margin-top: 12px;
+}
+
+.page-header {
+  margin-bottom: 12px;
+}
+
+.back-links {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.guide-section,
+.signal-section {
+  display: grid;
+  gap: 6px;
+}
+
+.guide-section ul,
+.signal-section ul,
+.guide-section ol,
+.signal-section ol {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
 }

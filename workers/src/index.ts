@@ -1,10 +1,12 @@
 import { fetchExplorerFacts } from "./explorer/client";
-import type {
-  Chain,
-  ExplorerErrorCode,
-  ExplorerFacts,
-  ExplorerValue,
-} from "./explorer/types";
+import type { Chain, ExplorerFacts, ExplorerValue } from "./explorer/types";
+import {
+  InspectRouteError,
+  type InspectError,
+  type InspectErrorCode,
+  type InputErrorCode,
+  getBlockingUpstreamError,
+} from "./utils/errors";
 
 const jsonResponse = (body: unknown, init?: ResponseInit): Response => {
   const headers = new Headers(init?.headers);
@@ -15,16 +17,6 @@ const jsonResponse = (body: unknown, init?: ResponseInit): Response => {
   });
 };
 
-const errorResponse = (message: string, status = 400): Response =>
-  jsonResponse(
-    {
-      ok: false,
-      error: { code: "bad_request", message },
-      meta: { generatedAt: new Date().toISOString(), cached: false },
-    },
-    { status }
-  );
-
 const isValidAddress = (address: string): boolean =>
   /^0x[0-9a-fA-F]{40}$/.test(address);
 const isValidChain = (chain: string): chain is Chain =>
@@ -34,22 +26,65 @@ const CACHE_TTL_SECONDS = 86400;
 const CACHE_CONTROL = `public, max-age=${CACHE_TTL_SECONDS}`;
 const RATE_LIMIT_WINDOW_SECONDS = 60;
 const RATE_LIMIT_MAX_REQUESTS = 10;
+const CACHE_HEADER_NAME = "x-tsi-cache";
+
+type CacheState = "HIT" | "MISS" | "STALE";
+
+type InspectSuccessResponse = ReturnType<typeof buildInspectPayload>;
+
+type InspectErrorResponse = {
+  ok: false;
+  error: {
+    code: InspectErrorCode;
+    message: string;
+    detail?: InspectError["detail"];
+  };
+  meta: {
+    ts: string;
+    generatedAt: string;
+    cached: false;
+  };
+};
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
-const withCors = (response: Response): Response => {
+const withCorsAndCache = (
+  response: Response,
+  cacheState: CacheState
+): Response => {
   const headers = new Headers(response.headers);
   Object.entries(CORS_HEADERS).forEach(([key, value]) => {
     headers.set(key, value);
   });
+  headers.set(CACHE_HEADER_NAME, cacheState);
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
     headers,
   });
+};
+
+const buildMetaTs = (): string => new Date().toISOString();
+
+const createInputError = (code: InputErrorCode, message: string): InspectRouteError =>
+  new InspectRouteError({ code, message, status: 400 });
+
+const buildErrorResponse = (inspectError: InspectError): Response => {
+  const ts = buildMetaTs();
+  const body: InspectErrorResponse = {
+    ok: false,
+    error: {
+      code: inspectError.code,
+      message: inspectError.message,
+      ...(inspectError.detail ? { detail: inspectError.detail } : {}),
+    },
+    meta: { ts, generatedAt: ts, cached: false },
+  };
+  return jsonResponse(body, { status: inspectError.status });
 };
 
 const buildRateLimitKey = (origin: string, ip: string): Request => {
@@ -59,24 +94,26 @@ const buildRateLimitKey = (origin: string, ip: string): Request => {
   return new Request(keyUrl.toString(), { method: "GET" });
 };
 
-const buildRateLimitExceededResponse = (): Response =>
-  jsonResponse(
+const buildRateLimitExceededResponse = (): Response => {
+  const ts = buildMetaTs();
+  return jsonResponse(
     {
       ok: false,
       error: {
         code: "rate_limited",
         message: "Too many requests. Please try again later.",
+        detail: { hint: "Please try again later.", status: 429 },
       },
-      meta: { generatedAt: new Date().toISOString(), cached: false },
+      meta: { ts, generatedAt: ts, cached: false },
     },
     {
       status: 429,
       headers: {
         "Retry-After": RATE_LIMIT_WINDOW_SECONDS.toString(),
-        ...CORS_HEADERS,
       },
     }
   );
+};
 
 type CheckResult = "ok" | "warn" | "high" | "unknown";
 type OverallRisk = "low" | "medium" | "high" | "unknown";
@@ -886,7 +923,9 @@ const buildInspectPayload = (
   address: string,
   cached: boolean,
   generatedAt: string,
-  explorerFacts?: ExplorerFacts
+  explorerFacts?: ExplorerFacts,
+  stale = false,
+  ts = buildMetaTs()
 ) => {
   const checks = [
     buildSellRestrictionCheck(explorerFacts ?? undefined),
@@ -910,7 +949,39 @@ const buildInspectPayload = (
       topReasons,
     },
     checks,
-    meta: { generatedAt, cached },
+    meta: { generatedAt, cached, stale, ts },
+  };
+};
+
+type CachedInspectPayload = InspectSuccessResponse;
+
+const readCachedPayload = async (
+  response: Response
+): Promise<CachedInspectPayload | null> => {
+  try {
+    return (await response.clone().json()) as CachedInspectPayload;
+  } catch (error) {
+    return null;
+  }
+};
+
+const buildCachedResponseFromPayload = (
+  payload: CachedInspectPayload
+): Response =>
+  jsonResponse(payload, {
+    headers: { "Cache-Control": CACHE_CONTROL, ...CORS_HEADERS },
+  });
+
+const buildStalePayload = (payload: CachedInspectPayload): CachedInspectPayload => {
+  const ts = buildMetaTs();
+  return {
+    ...payload,
+    meta: {
+      ...payload.meta,
+      cached: true,
+      stale: true,
+      ts,
+    },
   };
 };
 
@@ -925,11 +996,11 @@ export default {
       request.method === "OPTIONS" &&
       (url.pathname === "/api/inspect" || url.pathname === "/api/hello")
     ) {
-      return new Response(null, { status: 204, headers: CORS_HEADERS });
+      return withCorsAndCache(new Response(null, { status: 204 }), "MISS");
     }
 
     if (request.method === "GET" && url.pathname === "/api/hello") {
-      return withCors(jsonResponse({ ok: true, message: "hello" }));
+      return withCorsAndCache(jsonResponse({ ok: true, message: "hello" }), "MISS");
     }
 
     if (request.method === "GET" && url.pathname === "/api/inspect") {
@@ -951,7 +1022,7 @@ export default {
         }
 
         if (requestCount >= RATE_LIMIT_MAX_REQUESTS) {
-          return withCors(buildRateLimitExceededResponse());
+          return withCorsAndCache(buildRateLimitExceededResponse(), "MISS");
         }
 
         const rateLimitResponse = jsonResponse(
@@ -975,17 +1046,33 @@ export default {
       const address = url.searchParams.get("address");
 
       if (!chain || !address) {
-        return withCors(
-          errorResponse("Missing required query parameters: chain and address.")
+        return withCorsAndCache(
+          buildErrorResponse(
+            createInputError(
+              "missing_params",
+              "Missing required query parameters: chain and address."
+            )
+          ),
+          "MISS"
         );
       }
 
       if (!isValidAddress(address)) {
-        return withCors(errorResponse("Invalid address format."));
+        return withCorsAndCache(
+          buildErrorResponse(
+            createInputError("invalid_address", "Invalid address format.")
+          ),
+          "MISS"
+        );
       }
 
       if (!isValidChain(chain)) {
-        return withCors(errorResponse("Invalid chain. Use eth or bsc."));
+        return withCorsAndCache(
+          buildErrorResponse(
+            createInputError("invalid_chain", "Invalid chain. Use eth or bsc.")
+          ),
+          "MISS"
+        );
       }
 
       const cacheKeyUrl = new URL("/api/inspect", url.origin);
@@ -996,25 +1083,50 @@ export default {
       });
       let cachedResponse = await cache.match(cacheKey);
       if (cachedResponse) {
-        return withCors(cachedResponse);
+        const cachedPayload = await readCachedPayload(cachedResponse);
+        if (cachedPayload) {
+          const payloadWithTs = cachedPayload.meta.ts
+            ? cachedPayload
+            : {
+                ...cachedPayload,
+                meta: {
+                  ...cachedPayload.meta,
+                  cached: true,
+                  stale: false,
+                  ts: buildMetaTs(),
+                },
+              };
+          return withCorsAndCache(
+            buildCachedResponseFromPayload(payloadWithTs),
+            "HIT"
+          );
+        }
+        return withCorsAndCache(cachedResponse, "HIT");
       }
 
       try {
-        const generatedAt = new Date().toISOString();
+        const generatedAt = buildMetaTs();
         const explorerFacts = await fetchExplorerFacts(
           chain as Chain,
           address,
           env?.ETHERSCAN_API_KEY
         );
+        const blockingError = getBlockingUpstreamError(explorerFacts);
+        if (blockingError) {
+          throw new InspectRouteError(blockingError);
+        }
+
         const responseBody = buildInspectPayload(
           chain,
           address,
           false,
           generatedAt,
-          explorerFacts
+          explorerFacts,
+          false,
+          generatedAt
         );
         const response = jsonResponse(responseBody, {
-          headers: { "Cache-Control": CACHE_CONTROL, ...CORS_HEADERS },
+          headers: { "Cache-Control": CACHE_CONTROL },
         });
 
         const cachedBody = buildInspectPayload(
@@ -1022,28 +1134,45 @@ export default {
           address,
           true,
           generatedAt,
-          explorerFacts
+          explorerFacts,
+          false,
+          generatedAt
         );
-        const cacheResponse = jsonResponse(cachedBody, {
-          headers: { "Cache-Control": CACHE_CONTROL, ...CORS_HEADERS },
-        });
+        const cacheResponse = buildCachedResponseFromPayload(cachedBody);
 
         await cache.put(cacheKey, cacheResponse.clone());
-        return withCors(response);
+        return withCorsAndCache(response, "MISS");
       } catch (error) {
         cachedResponse = await cache.match(cacheKey);
         if (cachedResponse) {
-          return withCors(cachedResponse);
+          const cachedPayload = await readCachedPayload(cachedResponse);
+          if (cachedPayload) {
+            return withCorsAndCache(
+              buildCachedResponseFromPayload(buildStalePayload(cachedPayload)),
+              "STALE"
+            );
+          }
+          return withCorsAndCache(cachedResponse, "STALE");
         }
-        return withCors(
-          errorResponse("Unexpected error while generating response.", 500)
-        );
+
+        const inspectError =
+          error instanceof InspectRouteError
+            ? error.inspectError
+            : ({
+                code: "upstream_error",
+                message: "Unexpected upstream failure.",
+                status: 502,
+              } satisfies InspectError);
+        return withCorsAndCache(buildErrorResponse(inspectError), "MISS");
       }
     }
 
-    return jsonResponse(
-      { ok: false, error: { code: "not_found", message: "Not found" } },
-      { status: 404 }
+    return withCorsAndCache(
+      jsonResponse(
+        { ok: false, error: { code: "not_found", message: "Not found" } },
+        { status: 404 }
+      ),
+      "MISS"
     );
   },
 };

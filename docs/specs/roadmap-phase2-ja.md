@@ -1,205 +1,243 @@
 # Token Scam Inspector
 
-## 開発ロードマップ（Stage制 / Product Phase分離版）— Product Phase 2
+## 開発ロードマップ（Product Phase 2 / Task 19–28）
 
 ---
 
-## 用語定義（最初に固定）
+## 1. このロードマップの位置づけ（固定）
 
-### ■ Product Phase（プロダクト段階）
-
-* **Product Phase 1**：MVP（無料・最小）※完了済み
-* **Product Phase 2**：無料拡張（“分析として価値が出る”状態にする）
-* **Product Phase 3**：有料前提の高度化（深い解析・履歴・監視）
-
-👉 これは「プロダクトの成長段階」
+- 本書は Product Phase 2 の **実装タスク 19–28** を固定する。
+- 仕様の正本は `docs/specs/spec-phase2-ja.md` とし、本書は「順番と完了条件」を明確化する。
+- Task 19 は docs-only とし、API実装は変更しない。
 
 ---
 
-### ■ Development Stage（開発ステージ）
+## 2. Phase 2 のゴール（再掲・タスク設計の基準）
 
-* **Stage 8〜**：Product Phase 2 の実装ステップ
-* 各 Stage は **単独で完結・停止可能**
-* 原則：**無料運営のまま成立**（DB前提/高頻度追跡/巨大データは避ける）
+Phase 2 は次を満たして「分析として使える」状態を作る：
 
-👉 これは「作業の順番」
-
----
-
-## Product Phase 2 の狙い（Phase 2 で “価値が出る” 条件）
-
-Phase 2 の完了条件は、単に項目が増えることではなく次の4点を満たすこと：
-
-1) **Evidence が “URL + 事実（値）” で追跡できる**  
-   - “Found pattern” だけで high を出さない（誤爆防止）
-2) **high の乱発を止める**（ルール締め・根拠要件の強化）
-3) **rate limit / upstream 障害でも止まらない**（stale 返却 + 状態表示）
-4) **広い範囲で破綻してないことを担保する**（検証セット＋スモーク）
+1) Evidence が URL + 事実（値）で追跡できる
+2) high の乱発を止める（誤爆を減らす）
+3) rate limit / upstream 障害でも止まらない（stale返却 + 状態表示）
+4) 初心者が迷わない読む順番と説明導線を固定する
 
 ---
 
-## Development Stage 一覧（8–13）
+## 3. タスク一覧（Task 19–28）
+
+### Task 19 — Phase 2 docs audit+patch（docs-only）
+
+**Goal**
+- Phase 2 仕様とロードマップを「後続タスクが迷わない状態」に補強する。
+
+**Work items**
+- Phase 2 spec / roadmap の監査
+- 成功条件・非目標・互換性・stale・エラー分類・UX順序を明文化
+- （存在すれば）spec index に Phase 2 への導線を追加
+
+**Done criteria**
+- spec と roadmap が Task 20–28 の参照元として十分に具体
+- docs 以外の変更が含まれていない
+
+**Dependencies / notes**
+- docs-only（API実装は変更しない）
 
 ---
 
-## Stage 8：検証セット（Regression）を固定（少数例禁止）
+### Task 20 — UI skeleton upgrade（現行APIのまま）
 
-### 🎯 ゴール
+**Goal**
+- 現行の `/api/inspect` を変更せず、初心者が読める表示順へUI骨組みを更新する。
 
-「特定の数件だけ動く」を排除し、**広く外してない**を毎回確認できるようにする。
+**Work items**
+- summary/topReasons → checks → details → raw JSON（折りたたみ）
+- unknown の注記を追加
+- 360px を基準に崩れないことを優先
 
-### 作業内容
+**Done criteria**
+- API変更なしで表示順だけで理解できる
+- raw JSON が初期非表示
 
-* チェーン別に **検証用アドレスセット**を `docs/specs/` または `docs/references/` に固定（例：各チェーン 50〜200 件）
-  * 安全寄り（bluechip）
-  * ランダム
-  * 危険サンプル（既知 or ユーザー提供）
-* 最低限の **スモーク手順** を docs に明文化（手動でもOK）
-* 可能なら自動化（将来CI化できる形を維持）
-
-### 完了条件
-
-* 「このセットを回して崩れてない」を毎回確認できる
-* “3銘柄だけ”のような検証はしない（無価値）
+**Dependencies / notes**
+- Task 19 の仕様追記を前提にする
+- APIレスポンス形は変更しない
 
 ---
 
-## Stage 9：Evidence を “URL＋事実（値）” 形式へ統一（分析の核）
+### Task 21 — Shareable URL（/inspect/{chain}/{address}）
 
-### 🎯 ゴール
+**Goal**
+- 共有可能な安定URLで結果を再現できるようにする。
 
-ユーザーが根拠を追える＝**分析として成立**する状態にする。
+**Work items**
+- ルーティング追加（`/inspect/{chain}/{address}`）
+- URL からの自動入力と実行
+- 共有リンク導線（コピー）
 
-### 作業内容
+**Done criteria**
+- URL を開くだけで同じ結果に到達できる
+- 既存トップ導線を壊さない
 
-* checks の evidence を **構造化**（文字列羅列から脱却）
-  * 最低限：`sourceUrl` / `fact` / `value` / `notes`（相当の情報を必ず含める）
-* UI で evidence をリンクとして表示し、コピペ可能にする
-* 取得不能時も evidence を必ず出す
-  * 例：`rate_limited` / `missing_api_key` / `timeout` を “人間の言葉”にする
-
-### 完了条件
-
-* 各チェックが「どこを見てそう判断したか」を提示できる
-* unknown でも「なぜ分からないか」が読める
+**Dependencies / notes**
+- Task 20 の UI 骨組みと整合すること
 
 ---
 
-## Stage 10：判定ルールの締め（high乱発・誤爆の停止）
+### Task 22 — Error taxonomy + stale/header（non-breaking）
 
-### 🎯 ゴール
+**Goal**
+- エラーと stale を UI/運用が扱える形で安定化する（互換性維持）。
 
-「単語ヒットで high」みたいな **無価値な誤爆**を止める。
+**Work items**
+- 安定 error code を導入
+- `meta.stale` を追加
+- `x-tsi-cache: HIT | MISS | STALE` ヘッダーを追加
 
-### 作業内容
+**Done criteria**
+- Phase 1 のレスポンス形を壊さない
+- stale / error が UI で判別できる
 
-* high を返す条件を再定義：
-  * **強い根拠（確認可能な事実）があるときのみ high**
-  * それ以外は warn/unknown に落とす
-* “パターン検出” は evidence に残してもよいが、**単体で high にしない**
-* overallRisk も同様に「根拠があるときだけ上げる」方針へ
-
-### 完了条件
-
-* bluechip / 有名トークンが理由なしに high にならない
-* high のときは必ず根拠URLや確認可能な事実が提示される
-
----
-
-## Stage 11：耐障害性（rate limit / upstream失敗でも止めない）
-
-### 🎯 ゴール
-
-無料枠・外部API制限でも **サイトが“使える状態”を維持**する。
-
-### 作業内容
-
-* upstream が rate limit / timeout のとき：
-  * **stale キャッシュ返却**（あれば返す）
-  * `meta` に `fresh|stale` と `upstream_status` を入れる
-* UI に「今回は古い結果（stale）」を明示
-* “stale が無い場合”の表示も初心者向けに統一（次に何をすれば良いか）
-
-### 完了条件
-
-* BSC 等で rate limit が起きても「無価値な空表示」で終わらない
-* 少なくとも止まらず、状態が説明される
+**Dependencies / notes**
+- Phase 1 互換を壊さない（追加のみ）
+- Task 20 は現行API前提、Task 22 以降で拡張を読む
 
 ---
 
-## Stage 12：共有導線の固定（Shareable / SEO）
+### Task 23 — Checks explainability hardening（誤爆を減らす）
 
-### 🎯 ゴール
+**Goal**
+- 7チェックの説明可能性を上げつつ、誤爆（特に high 乱発）を抑える。
 
-貼れる・残る・検索される。**使われる導線**を作る。
+**Work items**
+- コメント/文字列ヒットの誤検知を best-effort で低減
+- evidence に「検出シグナルの具体名」を入れる
+- 単一の弱いシグナルで強判定に寄せない
 
-### 作業内容
+**Done criteria**
+- high は確認可能な根拠がある時だけ
+- unknown / warn / ok の説明が一貫
 
-* 共有URLを安定化（例：`/inspect/{chain}/{address}`）
-  * 直リンクでページが開き、同じ結果が見られる（キャッシュ前提）
-* “危険サイン辞書”ページを用意（SEO/教育）
-  * 用語の解説、なぜ危険か、どう確認するか
-* UI 上に「共有リンク」ボタン（コピー）
-
-### 完了条件
-
-* 結果ページをURLで共有できる
-* 辞書ページが引用できる（説明が資産になる）
+**Dependencies / notes**
+- Task 22 の error/stale 表現と矛盾しないこと
 
 ---
 
-## Stage 13：初心者UXの固定（読む順番・文章・入力支援）
+### Task 24 — Token identity best-effort（result.token）
 
-### 🎯 ゴール
+**Goal**
+- トークン名/シンボル等の identity を best-effort で補完する。
 
-初心者が「何を見ればいいか」迷わない **読む順番**を確定する。
+**Work items**
+- Explorer / RPC を使った補完（無料枠で壊れにくい範囲）
+- `result.token` を追加（互換性維持）
 
-### 作業内容
+**Done criteria**
+- identity 取得失敗でも壊れない
+- 追加は互換性を壊さない
 
-* 表示順を固定：
-  1) 要点（topReasons）
-  2) チェック一覧（short）
-  3) 詳細（detail + evidence + howToVerify）
-* 入力支援：
-  * 例入力（サンプル）
-  * エラー文を人間語に（形式/必須/対応チェーン）
-* 注意書き（断定しない/unknownの意味/投資助言ではない）を常設
-
-### 完了条件
-
-* JSONを読む必要がなくなる（画面だけで理解できる）
-* 初見ユーザーが試しやすい（エラー離脱を減らす）
+**Dependencies / notes**
+- Task 22 の互換性ルールを厳守
 
 ---
 
-## Product Phase 2 完了後のサイト挙動（まとめ）
+### Task 25 — Verification set + smoke check
 
-* ユーザーが chain/address を入力 → 検査
-* 結果は **根拠URL＋事実（値）** で表示され、追跡できる
-* high は乱発せず、根拠があるときだけ出る
-* rate limit 等でも stale を返し、状態が説明される
-* 結果ページを URL で共有できる
-* 辞書ページで危険サインの意味を理解できる
+**Goal**
+- 「広く破綻していない」を確認できる検証導線を固定する。
+
+**Work items**
+- チェーン別検証セットを docs に固定
+- 先頭N件を叩くスモーク手順を明文化
+
+**Done criteria**
+- 少数例検証から脱却できている
+- 破壊的変更を検知しやすい
+
+**Dependencies / notes**
+- Task 23–24 の変更を受け止める安全網
 
 ---
 
-## Product Phase 3（将来）：有料前提の進化（予告）
+### Task 26 — Guide + Dictionary pages（静的導線）
 
-* 深いデータ（ホルダー/取引/クラスター等）の追加
-* 変化履歴・監視通知（コスト前提）
-* provider 差し替え（高精度データ導入）
+**Goal**
+- 初心者が「なぜ重要か／どう確認するか」に到達できる静的導線を用意する。
+
+**Work items**
+- Guide 1本
+- 7チェック分の辞書ページ（meaning / why / howToVerify）
+
+**Done criteria**
+- UI から静的導線に到達できる
+- 説明がページとして資産化される
+
+**Dependencies / notes**
+- Task 20–21 の画面導線と接続する
 
 ---
 
-## Codex投入単位（最重要 / Phase 2）
+### Task 27 — i18n toggle（辞書ベース JA/EN）
 
-❌ Stage 8〜13 を全部まとめて投入しない  
-⭕ 1 Stage = 1 PR（止めやすく、事故りにくい）
+**Goal**
+- 辞書ベースで JA/EN を切り替えられる最小構成を入れる。
 
-推奨順：
-1) Stage 9（Evidence統一）
-2) Stage 10（誤爆停止）
-3) Stage 11（耐障害）
-4) Stage 12（共有/SEO）
-5) Stage 13（初心者UX）
-6) Stage 8（検証セット増強）※並行でも可
+**Work items**
+- 文言辞書の導入
+- JA/EN 切替トグル
+- 既存文言を段階的に辞書へ寄せる
+
+**Done criteria**
+- 主要導線が JA/EN で崩れない
+- 追加言語の拡張余地がある
+
+**Dependencies / notes**
+- Task 26 の静的ページ群と相性が良い
+
+---
+
+### Task 28 — Ops notes + smoke script
+
+**Goal**
+- 無料枠運用で「壊れても理由が分かる」状態を整える。
+
+**Work items**
+- smoke check スクリプト（または手順）
+- README / 運用メモに制限と見え方を追記
+
+**Done criteria**
+- デプロイ後に最低限の健全性確認ができる
+- rate limit / upstream 失敗時の見え方が言語化されている
+
+**Dependencies / notes**
+- Task 22 の error/stale と整合すること
+
+---
+
+## 4. 依存関係（明示ルール）
+
+- Task 19 は docs-only（実装変更なし）。
+- Task 20 は現行APIを前提にし、API実装を変更しない。
+- Task 22 は Phase 1 互換を壊さない追加（`meta.stale` / header など）のみを行う。
+- Task 23 以降は Task 22 の error/stale 表現を前提に UI/説明を強化する。
+
+---
+
+## 5. Phase 2 に含めないこと（spec と整合）
+
+Phase 2 では次を含めない（Non-goals）：
+
+- 詐欺の断定（verdict を出さない）
+- 投資助言（売買・投資判断の推奨をしない）
+- 点数化・ランキング化
+- 有料インフラ必須化（paid API / DB 必須）
+- 高頻度リアルタイム監視
+- 全チェーン完全対応（無制限追加）
+
+---
+
+## 6. PR運用単位（固定）
+
+- 1 task = 1 PR を厳守する。
+- 関連しない改善を同一PRに混ぜない。
+
+---

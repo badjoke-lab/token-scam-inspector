@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Owner privileges | Token Scam Inspector</title>
+    <meta name="description" content="Owner privileges（オーナー権限）シグナルの意味、注意点、確認手順を中立に整理します。">
+    <link rel="stylesheet" href="../../style.css">
+  </head>
+  <body>
+    <main class="container">
+      <header class="page-header">
+        <h1>Owner privileges</h1>
+        <p class="subtitle">開発者や管理者が重要な設定を変更できる可能性を示すシグナルです。</p>
+      </header>
+
+      <section class="signal-section" aria-labelledby="meaning-heading">
+        <h2 id="meaning-heading">1) Meaning</h2>
+        <p>
+          Owner privilegesは、オーナー（または特定ロール）が取引条件や手数料などを変更できる設計を示します。
+          今は問題がなくても、あとから条件が変わる余地を表します。
+        </p>
+      </section>
+
+      <section class="signal-section" aria-labelledby="why-heading">
+        <h2 id="why-heading">2) Why it matters</h2>
+        <p>
+          強い権限が残っていると、ユーザーに不利な変更が可能になります。
+          変更の有無や範囲が読み取りづらいと、リスク判断が難しくなります。
+        </p>
+      </section>
+
+      <section class="signal-section" aria-labelledby="legit-heading">
+        <h2 id="legit-heading">3) Common legit reasons</h2>
+        <ul>
+          <li>ローンチ直後の調整のために一時的に権限を残している</li>
+          <li>マルチシグやTimelockで運用されている</li>
+          <li>権限はあるが、対象が限定的で説明が明確</li>
+        </ul>
+      </section>
+
+      <section class="signal-section" aria-labelledby="verify-heading">
+        <h2 id="verify-heading">4) How to verify</h2>
+        <ul>
+          <li>エクスプローラーのContract / Read / Writeを確認する</li>
+          <li>ownerやroleのアドレスが誰かを追跡する</li>
+          <li>権限変更（transferOwnership / renounce）履歴があるかを見る</li>
+          <li>公式ドキュメントに権限設計の説明があるか確認する</li>
+        </ul>
+      </section>
+
+      <section class="signal-section" aria-labelledby="limits-heading">
+        <h2 id="limits-heading">5) What this tool can/can’t detect</h2>
+        <p>
+          このツールは、権限を示すパターンの有無を検出します。
+          ただし、実際の運用体制（誰が鍵を持つか、どう承認されるか）までは判断できません。
+        </p>
+        <ul>
+          <li>検出できること：ownerや強い権限関数の存在</li>
+          <li>検出が難しいこと：運用ルールやオフチェーンの合意</li>
+        </ul>
+      </section>
+
+      <section class="signal-section" aria-labelledby="links-heading">
+        <h2 id="links-heading">6) Links</h2>
+        <p class="back-links">
+          <a href="../../">Back to results</a>
+          <a href="../../guide/">Back to guide</a>
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

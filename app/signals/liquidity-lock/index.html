@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Liquidity lock | Token Scam Inspector</title>
+    <meta name="description" content="Liquidity lock（流動性ロック）シグナルの意味と、LPの確認ポイントを初心者向けに整理します。">
+    <link rel="stylesheet" href="../../style.css">
+  </head>
+  <body>
+    <main class="container">
+      <header class="page-header">
+        <h1>Liquidity lock</h1>
+        <p class="subtitle">流動性（LP）が外される可能性を読み解くためのシグナルです。</p>
+      </header>
+
+      <section class="signal-section" aria-labelledby="meaning-heading">
+        <h2 id="meaning-heading">1) Meaning</h2>
+        <p>
+          Liquidity lockは、DEXの流動性が固定されているか、外せる状態かを確認する観点です。
+          ロック状況が不明な場合もunknownとして表示されます。
+        </p>
+      </section>
+
+      <section class="signal-section" aria-labelledby="why-heading">
+        <h2 id="why-heading">2) Why it matters</h2>
+        <p>
+          流動性が大きく引き上げられると、売買が成立しにくくなる可能性があります。
+          価格があっても取引できない状態になる点が重要です。
+        </p>
+      </section>
+
+      <section class="signal-section" aria-labelledby="legit-heading">
+        <h2 id="legit-heading">3) Common legit reasons</h2>
+        <ul>
+          <li>ロック情報が外部サービスにあり、取得できない</li>
+          <li>複数のLPに分散していて全体像が見えにくい</li>
+          <li>初期はロックなしでも、後からロックする計画がある</li>
+        </ul>
+      </section>
+
+      <section class="signal-section" aria-labelledby="verify-heading">
+        <h2 id="verify-heading">4) How to verify</h2>
+        <ul>
+          <li>主要DEXで対象ペアのLPトークンを特定する</li>
+          <li>エクスプローラーでLP保有者が誰かを確認する</li>
+          <li>LPトークンがロックサービスに送られているかを見る</li>
+          <li>ロック期間や解除予定日が公開されているか確認する</li>
+        </ul>
+      </section>
+
+      <section class="signal-section" aria-labelledby="limits-heading">
+        <h2 id="limits-heading">5) What this tool can/can’t detect</h2>
+        <p>
+          このツールは、流動性ロックの手がかりを探します。
+          ただし、すべてのLPやロックサービスを網羅できるわけではありません。
+        </p>
+        <ul>
+          <li>検出できること：ロックの有無に関する公開シグナル</li>
+          <li>検出が難しいこと：複数LPの全体把握や新規ロック直後の反映</li>
+        </ul>
+      </section>
+
+      <section class="signal-section" aria-labelledby="links-heading">
+        <h2 id="links-heading">6) Links</h2>
+        <p class="back-links">
+          <a href="../../">Back to results</a>
+          <a href="../../guide/">Back to guide</a>
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

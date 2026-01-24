@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Contract verification | Token Scam Inspector</title>
+    <meta name="description" content="Contract verification（コントラクト検証）シグナルの意味と、公開コードの確認ポイントを説明します。">
+    <link rel="stylesheet" href="../../style.css">
+  </head>
+  <body>
+    <main class="container">
+      <header class="page-header">
+        <h1>Contract verification</h1>
+        <p class="subtitle">コードが公開されているかどうかを確認するためのシグナルです。</p>
+      </header>
+
+      <section class="signal-section" aria-labelledby="meaning-heading">
+        <h2 id="meaning-heading">1) Meaning</h2>
+        <p>
+          Contract verificationは、エクスプローラー上でソースコードが検証済みかを示します。
+          未検証の場合、コードの中身をその場で読むことが難しくなります。
+        </p>
+      </section>
+
+      <section class="signal-section" aria-labelledby="why-heading">
+        <h2 id="why-heading">2) Why it matters</h2>
+        <p>
+          コードが公開されていないと、何ができるコントラクトかを確認しづらくなります。
+          透明性が低い状態は、追加確認の必要性を高めます。
+        </p>
+      </section>
+
+      <section class="signal-section" aria-labelledby="legit-heading">
+        <h2 id="legit-heading">3) Common legit reasons</h2>
+        <ul>
+          <li>デプロイ直後で、検証作業がまだ終わっていない</li>
+          <li>Blockscoutなど別のエクスプローラーでは検証済み</li>
+          <li>プロキシ構成で、実装側の確認が必要</li>
+        </ul>
+      </section>
+
+      <section class="signal-section" aria-labelledby="verify-heading">
+        <h2 id="verify-heading">4) How to verify</h2>
+        <ul>
+          <li>エクスプローラーのCodeタブでVerified表示を確認する</li>
+          <li>プロキシの場合はImplementationアドレスをたどる</li>
+          <li>同一アドレスが複数エクスプローラーでどう表示されるか比較する</li>
+          <li>公式がソースコードや監査情報を公開しているか確認する</li>
+        </ul>
+      </section>
+
+      <section class="signal-section" aria-labelledby="limits-heading">
+        <h2 id="limits-heading">5) What this tool can/can’t detect</h2>
+        <p>
+          このツールは、検証状態の手がかりを示します。
+          ただし、検証済みであっても内容の良し悪しまでは判断しません。
+        </p>
+        <ul>
+          <li>検出できること：検証済みかどうかの状態</li>
+          <li>検出が難しいこと：コードの品質や設計の妥当性</li>
+        </ul>
+      </section>
+
+      <section class="signal-section" aria-labelledby="links-heading">
+        <h2 id="links-heading">6) Links</h2>
+        <p class="back-links">
+          <a href="../../">Back to results</a>
+          <a href="../../guide/">Back to guide</a>
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

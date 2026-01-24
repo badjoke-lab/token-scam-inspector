@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Holder concentration | Token Scam Inspector</title>
+    <meta name="description" content="Holder concentration（保有集中）シグナルの意味と、上位保有者の確認方法をまとめます。">
+    <link rel="stylesheet" href="../../style.css">
+  </head>
+  <body>
+    <main class="container">
+      <header class="page-header">
+        <h1>Holder concentration</h1>
+        <p class="subtitle">少数のウォレットに保有が集中していないかを確認するシグナルです。</p>
+      </header>
+
+      <section class="signal-section" aria-labelledby="meaning-heading">
+        <h2 id="meaning-heading">1) Meaning</h2>
+        <p>
+          Holder concentrationは、上位の保有者が全体の多くを占めていないかを見る観点です。
+          Top 1 / 5 / 10の割合が高いほど、影響力が偏りやすくなります。
+        </p>
+      </section>
+
+      <section class="signal-section" aria-labelledby="why-heading">
+        <h2 id="why-heading">2) Why it matters</h2>
+        <p>
+          大きな保有者が売却や移動をすると、市場に与える影響が大きくなります。
+          集中が高い場合は、価格変動が激しくなる可能性も考えられます。
+        </p>
+      </section>
+
+      <section class="signal-section" aria-labelledby="legit-heading">
+        <h2 id="legit-heading">3) Common legit reasons</h2>
+        <ul>
+          <li>チームやトレジャリーが意図的に多く保有している</li>
+          <li>ロック中の配布用ウォレットが上位にいる</li>
+          <li>ブリッジや取引所ウォレットが集中して見える</li>
+        </ul>
+      </section>
+
+      <section class="signal-section" aria-labelledby="verify-heading">
+        <h2 id="verify-heading">4) How to verify</h2>
+        <ul>
+          <li>エクスプローラーのHoldersタブで上位アドレスを確認する</li>
+          <li>上位アドレスが取引所・ブリッジ・ロック先かを特定する</li>
+          <li>上位アドレスの直近の入出金トランザクションを見る</li>
+          <li>公式資料に配布計画やロック情報があるか確認する</li>
+        </ul>
+      </section>
+
+      <section class="signal-section" aria-labelledby="limits-heading">
+        <h2 id="limits-heading">5) What this tool can/can’t detect</h2>
+        <p>
+          このツールは、保有比率の偏りをシグナルとして示します。
+          ただし、そのウォレットが誰のものか、売却予定があるかまではわかりません。
+        </p>
+        <ul>
+          <li>検出できること：上位保有割合の偏り</li>
+          <li>検出が難しいこと：ウォレットの実態や今後の行動</li>
+        </ul>
+      </section>
+
+      <section class="signal-section" aria-labelledby="links-heading">
+        <h2 id="links-heading">6) Links</h2>
+        <p class="back-links">
+          <a href="../../">Back to results</a>
+          <a href="../../guide/">Back to guide</a>
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

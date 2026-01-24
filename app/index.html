@@ -3,13 +3,37 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Token Risk Inspector</title>
+    <title>Token Scam Inspector</title>
+    <meta name="description" content="Inspect token risk signals with beginner-friendly explanations and neutral guidance.">
     <link rel="stylesheet" href="./style.css">
   </head>
   <body>
     <main class="container">
-      <h1>Token Risk Inspector</h1>
-      <p class="subtitle">Risk signals with explanations. Not a verdict.</p>
+      <h1>Token Scam Inspector</h1>
+      <p class="subtitle">Explainable risk signals. Not a scam verdict.</p>
+
+      <nav class="page-nav" aria-label="Primary">
+        <ul class="page-nav-list">
+          <li><a href="./guide/">Beginner guide</a></li>
+          <li><a href="#checks-dictionary">Check dictionary</a></li>
+        </ul>
+      </nav>
+
+      <section id="checks-dictionary" class="result-block" aria-labelledby="dictionary-heading">
+        <h2 id="dictionary-heading">Check dictionary</h2>
+        <p class="note-block">
+          Each check has a short explanation page. Unknown means the tool could not confirm it.
+        </p>
+        <ul class="dictionary-list">
+          <li><a href="./signals/sell-restriction/">Sell restriction</a></li>
+          <li><a href="./signals/owner-privileges/">Owner privileges</a></li>
+          <li><a href="./signals/mint-capability/">Mint capability</a></li>
+          <li><a href="./signals/liquidity-lock/">Liquidity lock</a></li>
+          <li><a href="./signals/holder-concentration/">Holder concentration</a></li>
+          <li><a href="./signals/contract-verification/">Contract verification</a></li>
+          <li><a href="./signals/trading-control/">Trading control</a></li>
+        </ul>
+      </section>
 
       <form id="inspect-form" class="form">
         <label for="chain">Chain</label>

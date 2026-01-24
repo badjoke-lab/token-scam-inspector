@@ -275,3 +275,28 @@ details summary:focus {
   display: grid;
   gap: 4px;
 }
+
+.page-header {
+  display: grid;
+  gap: 6px;
+}
+
+.lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.lang-toggle-button {
+  width: auto;
+  padding: 4px 6px;
+}
+
+.lang-toggle-button[data-lang-active="true"] {
+  font-weight: 600;
+}
+
+.lang-toggle-separator {
+  display: inline-block;
+}

@@ -3,71 +3,79 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Trading control | Token Scam Inspector</title>
-    <meta name="description" content="Trading control（取引制御）シグナルの意味と、取引停止や制限の確認手順を初心者向けにまとめます。">
+    <title data-i18n="signal.tradingControl.title">Trading control | Token Scam Inspector</title>
+    <meta name="description" data-i18n-attr="content" data-i18n="signal.tradingControl.description" content="Trading control（取引制御）シグナルの意味、注意点、確認手順を初心者向けに説明します。">
     <link rel="stylesheet" href="../../style.css">
   </head>
   <body>
     <main class="container">
       <header class="page-header">
-        <h1>Trading control</h1>
-        <p class="subtitle">取引を止めたり制限したりできる設計の可能性を示すシグナルです。</p>
+        <h1 data-i18n="signal.tradingControl.heading">Trading control</h1>
+        <p class="subtitle" data-i18n="signal.tradingControl.subtitle">取引の開始・停止や条件を制御できる可能性を示すシグナルです。</p>
+        <div class="lang-toggle" role="group" data-i18n-attr="aria-label" data-i18n="lang.toggle.label" aria-label="Language">
+          <button type="button" class="lang-toggle-button" data-lang-switch="ja" data-i18n="lang.toggle.ja">JA</button>
+          <span class="lang-toggle-separator" aria-hidden="true">/</span>
+          <button type="button" class="lang-toggle-button" data-lang-switch="en" data-i18n="lang.toggle.en">EN</button>
+        </div>
       </header>
 
       <section class="signal-section" aria-labelledby="meaning-heading">
-        <h2 id="meaning-heading">1) Meaning</h2>
+        <h2 id="meaning-heading" data-i18n="signals.sections.meaning">1) Meaning</h2>
         <p>
-          Trading controlは、tradingEnabledやpauseのような取引制御機能が存在する可能性を示します。
-          条件次第で取引が止まる設計だと、挙動の確認が重要になります。
+          Trading controlは、取引の開始・停止や条件を管理者が制御できる可能性を示します。
+          例えば、tradingEnabledの切り替えや、特定条件下での制限が該当します。
         </p>
       </section>
 
       <section class="signal-section" aria-labelledby="why-heading">
-        <h2 id="why-heading">2) Why it matters</h2>
+        <h2 id="why-heading" data-i18n="signals.sections.why">2) Why it matters</h2>
         <p>
-          取引を停止できる機能があると、買った後に状況が変わる可能性があります。
-          いつ誰が制御できるかが分からない場合は、慎重に情報を集める必要があります。
+          取引制御が強いと、想定外のタイミングで取引できなくなる可能性があります。
+          誰が、どの条件で制御できるかが重要なポイントです。
         </p>
       </section>
 
       <section class="signal-section" aria-labelledby="legit-heading">
-        <h2 id="legit-heading">3) Common legit reasons</h2>
+        <h2 id="legit-heading" data-i18n="signals.sections.legit">3) Common legit reasons</h2>
         <ul>
-          <li>ローンチ直後の調整やトラブル対応のための一時停止機能</li>
-          <li>誤送金や緊急時の保護を目的としたpause機能</li>
-          <li>制御機能はあるが、Timelockなどで制限されている</li>
+          <li>ローンチ直後の制御や段階的な解放</li>
+          <li>ボット対策や異常時対応のための一時的制御</li>
+          <li>ガバナンス移行までの暫定管理</li>
         </ul>
       </section>
 
       <section class="signal-section" aria-labelledby="verify-heading">
-        <h2 id="verify-heading">4) How to verify</h2>
+        <h2 id="verify-heading" data-i18n="signals.sections.how">4) How to verify</h2>
         <ul>
-          <li>エクスプローラーのCode / ReadでtradingEnabledやpause関連を探す</li>
-          <li>制御権限を持つアドレスやroleを確認する</li>
-          <li>過去に取引停止や再開が行われた履歴があるかを見る</li>
-          <li>公式が制御条件や解除手順を説明しているか確認する</li>
+          <li>CodeでtradingEnabled / setTradingEnabled等の関数を確認する</li>
+          <li>制御権限がowner/roleに紐づいているかを確認する</li>
+          <li>直近の取引停止や再開の履歴がないかを確認する</li>
+          <li>公式の説明と実際の制御手段が一致するかを確認する</li>
         </ul>
       </section>
 
       <section class="signal-section" aria-labelledby="limits-heading">
-        <h2 id="limits-heading">5) What this tool can/can’t detect</h2>
+        <h2 id="limits-heading" data-i18n="signals.sections.limits">5) What this tool can/can’t detect</h2>
         <p>
-          このツールは、取引制御の可能性を示すシグナルを検出します。
-          ただし、実際にいつ発動するか、誰が操作するかまでは確定できません。
+          このツールは、取引制御に関連する公開情報の兆候を探します。
+          ただし、実際にいつ制御が行使されるかは保証できません。
         </p>
         <ul>
-          <li>検出できること：取引制御に関する機能の存在</li>
-          <li>検出が難しいこと：運用ルールや発動条件の詳細</li>
+          <li>検出できること：取引制御に関する関数や設定の兆候</li>
+          <li>検出が難しいこと：運用上の判断や将来の変更タイミング</li>
         </ul>
       </section>
 
       <section class="signal-section" aria-labelledby="links-heading">
-        <h2 id="links-heading">6) Links</h2>
+        <h2 id="links-heading" data-i18n="signals.sections.links">6) Links</h2>
         <p class="back-links">
-          <a href="../../">Back to results</a>
-          <a href="../../guide/">Back to guide</a>
+          <a href="../../" data-i18n="signals.back">Back to results</a>
+          <a href="../../guide/" data-i18n="signals.guide">Back to guide</a>
         </p>
       </section>
     </main>
+    <script src="../../assets/i18n/ja.js"></script>
+    <script src="../../assets/i18n/en.js"></script>
+    <script src="../../assets/i18n.js"></script>
   </body>
 </html>

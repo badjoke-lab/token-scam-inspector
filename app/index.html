@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,49 +9,56 @@
   </head>
   <body>
     <main class="container">
-      <h1>Token Scam Inspector</h1>
-      <p class="subtitle">Explainable risk signals. Not a scam verdict.</p>
+      <header class="page-header">
+        <h1 data-i18n="site.title">Token Scam Inspector</h1>
+        <p class="subtitle" data-i18n="site.subtitle">Explainable risk signals. Not a scam verdict.</p>
+        <div class="lang-toggle" role="group" data-i18n-attr="aria-label" data-i18n="lang.toggle.label" aria-label="Language">
+          <button type="button" class="lang-toggle-button" data-lang-switch="ja" data-i18n="lang.toggle.ja">JA</button>
+          <span class="lang-toggle-separator" aria-hidden="true">/</span>
+          <button type="button" class="lang-toggle-button" data-lang-switch="en" data-i18n="lang.toggle.en">EN</button>
+        </div>
+      </header>
 
-      <nav class="page-nav" aria-label="Primary">
+      <nav class="page-nav" data-i18n-attr="aria-label" data-i18n="nav.primary" aria-label="Primary">
         <ul class="page-nav-list">
-          <li><a href="./guide/">Beginner guide</a></li>
-          <li><a href="#checks-dictionary">Check dictionary</a></li>
+          <li><a href="./guide/" data-i18n="nav.guide">Beginner guide</a></li>
+          <li><a href="#checks-dictionary" data-i18n="nav.dictionary">Check dictionary</a></li>
         </ul>
       </nav>
 
       <section id="checks-dictionary" class="result-block" aria-labelledby="dictionary-heading">
-        <h2 id="dictionary-heading">Check dictionary</h2>
-        <p class="note-block">
+        <h2 id="dictionary-heading" data-i18n="dictionary.heading">Check dictionary</h2>
+        <p class="note-block" data-i18n="dictionary.note">
           Each check has a short explanation page. Unknown means the tool could not confirm it.
         </p>
         <ul class="dictionary-list">
-          <li><a href="./signals/sell-restriction/">Sell restriction</a></li>
-          <li><a href="./signals/owner-privileges/">Owner privileges</a></li>
-          <li><a href="./signals/mint-capability/">Mint capability</a></li>
-          <li><a href="./signals/liquidity-lock/">Liquidity lock</a></li>
-          <li><a href="./signals/holder-concentration/">Holder concentration</a></li>
-          <li><a href="./signals/contract-verification/">Contract verification</a></li>
-          <li><a href="./signals/trading-control/">Trading control</a></li>
+          <li><a href="./signals/sell-restriction/" data-i18n="signals.sellRestriction">Sell restriction</a></li>
+          <li><a href="./signals/owner-privileges/" data-i18n="signals.ownerPrivileges">Owner privileges</a></li>
+          <li><a href="./signals/mint-capability/" data-i18n="signals.mintCapability">Mint capability</a></li>
+          <li><a href="./signals/liquidity-lock/" data-i18n="signals.liquidityLock">Liquidity lock</a></li>
+          <li><a href="./signals/holder-concentration/" data-i18n="signals.holderConcentration">Holder concentration</a></li>
+          <li><a href="./signals/contract-verification/" data-i18n="signals.contractVerification">Contract verification</a></li>
+          <li><a href="./signals/trading-control/" data-i18n="signals.tradingControl">Trading control</a></li>
         </ul>
       </section>
 
       <form id="inspect-form" class="form">
-        <label for="chain">Chain</label>
+        <label for="chain" data-i18n="form.chain.label">Chain</label>
         <select id="chain" name="chain">
-          <option value="eth" selected>Ethereum (ERC-20)</option>
-          <option value="bsc">BSC (BEP-20)</option>
+          <option value="eth" selected data-i18n="form.chain.eth">Ethereum (ERC-20)</option>
+          <option value="bsc" data-i18n="form.chain.bsc">BSC (BEP-20)</option>
         </select>
 
-        <label for="address">Contract address</label>
-        <input id="address" name="address" type="text" placeholder="0x..." autocomplete="off" />
+        <label for="address" data-i18n="form.address.label">Contract address</label>
+        <input id="address" name="address" type="text" data-i18n-attr="placeholder" data-i18n="form.address.placeholder" placeholder="0x..." autocomplete="off" />
 
-        <button id="inspect-button" type="submit">Inspect</button>
+        <button id="inspect-button" type="submit" data-i18n="form.submit">Inspect</button>
       </form>
 
-      <p class="status" id="status" role="status">Enter a contract address to begin.</p>
+      <p class="status" id="status" role="status" data-i18n="status.idle">Enter a contract address to begin.</p>
 
       <section class="results" aria-live="polite">
-        <p id="unknown-note" class="note unknown-note">
+        <p id="unknown-note" class="note unknown-note" data-i18n="unknown.note">
           unknown = 確認できなかった（安全を意味しない）
         </p>
 
@@ -60,64 +67,67 @@
         <div id="result-error" class="error-box" hidden></div>
 
         <div id="empty-state" class="state-block">
-          <h2>How to use</h2>
-          <p>Choose a chain, paste the token contract address, and press Inspect.</p>
-          <p class="example">Example: 0x0000000000000000000000000000000000000000</p>
+          <h2 data-i18n="state.empty.heading">How to use</h2>
+          <p data-i18n="state.empty.body">Choose a chain, paste the token contract address, and press Inspect.</p>
+          <p class="example" data-i18n="state.empty.example">Example: 0x0000000000000000000000000000000000000000</p>
         </div>
 
         <div id="loading-state" class="state-block" hidden>
-          <h2>Inspecting</h2>
-          <p class="loading-line">Inspecting token… Cached results may be used.</p>
+          <h2 data-i18n="state.loading.heading">Inspecting</h2>
+          <p class="loading-line" data-i18n="state.loading.body">Inspecting token… Cached results may be used.</p>
         </div>
 
         <div id="success-state" hidden>
           <section class="result-block" aria-labelledby="overall-heading">
-            <h2 id="overall-heading">Overall</h2>
+            <h2 id="overall-heading" data-i18n="overall.heading">Overall</h2>
             <div class="overall-row">
               <span id="overall-badge" class="badge badge-unknown">unknown</span>
-              <p id="overall-summary" class="overall-summary">No inspection yet.</p>
+              <p id="overall-summary" class="overall-summary" data-i18n="overall.summary.empty">No inspection yet.</p>
             </div>
           </section>
 
           <section class="result-block" aria-labelledby="reasons-heading">
-            <h2 id="reasons-heading">Top reasons</h2>
+            <h2 id="reasons-heading" data-i18n="reasons.heading">Top reasons</h2>
             <ul id="top-reasons" class="reasons-list">
-              <li>No top reasons available.</li>
+              <li data-i18n="reasons.empty">No top reasons available.</li>
             </ul>
           </section>
 
           <section class="result-block" aria-labelledby="checks-heading">
-            <h2 id="checks-heading">Checks</h2>
+            <h2 id="checks-heading" data-i18n="checks.heading">Checks</h2>
             <ul id="checks-list" class="checks-list">
-              <li class="check-row">No checks available.</li>
+              <li class="check-row" data-i18n="checks.empty">No checks available.</li>
             </ul>
           </section>
 
           <section class="result-block" aria-labelledby="details-heading">
-            <h2 id="details-heading">Details</h2>
+            <h2 id="details-heading" data-i18n="details.heading">Details</h2>
             <div id="check-details" class="details-list">
-              <p>No details available.</p>
+              <p data-i18n="details.empty">No details available.</p>
             </div>
           </section>
 
           <section class="result-block share-block" aria-labelledby="share-heading">
-            <h2 id="share-heading">Share</h2>
-            <button id="copy-share-link" type="button">共有リンクをコピー</button>
+            <h2 id="share-heading" data-i18n="share.heading">Share</h2>
+            <button id="copy-share-link" type="button" data-i18n="share.copy">共有リンクをコピー</button>
             <p id="copy-feedback" class="copy-feedback" role="status" aria-live="polite" hidden></p>
           </section>
         </div>
 
         <div id="raw-json-block" class="result-block raw-json" hidden>
           <details>
-            <summary>Raw JSON</summary>
+            <summary data-i18n="raw.heading">Raw JSON</summary>
             <pre><code id="result">{}</code></pre>
           </details>
         </div>
       </section>
 
-      <p class="note">This tool shows risk signals with explanations. Not a verdict.</p>
-      <p class="note">No investment advice.</p>
+      <p class="note" data-i18n="footer.note1">This tool shows risk signals with explanations. Not a verdict.</p>
+      <p class="note" data-i18n="footer.note2">No investment advice.</p>
     </main>
+    <script src="./assets/i18n/ja.js"></script>
+    <script src="./assets/i18n/en.js"></script>
+    <script src="./assets/i18n.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

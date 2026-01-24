@@ -46,6 +46,14 @@ const SIGNAL_SLUG_BY_ID = {
 let isLoading = false;
 let copyFeedbackTimerId = null;
 let currentInspectParams = null;
+let lastResponseData = null;
+let lastCacheHeader = "";
+let lastState = "empty";
+let lastInspectParams = null;
+
+const i18n = window.TSI_I18N;
+
+const t = (key, params, fallback) => (i18n && i18n.t(key, params)) || fallback || "";
 
 const setLoading = (loading) => {
   isLoading = loading;
@@ -57,6 +65,10 @@ const setLoading = (loading) => {
 
 const updateStatus = (message) => {
   statusLine.textContent = message;
+};
+
+const updateStatusKey = (key, params, fallback) => {
+  updateStatus(t(key, params, fallback));
 };
 
 const renderJson = (data) => {
@@ -94,13 +106,13 @@ const setBadge = (element, value) => {
 const updateCacheHint = (cacheHeader, meta) => {
   const hints = [];
   if (cacheHeader) {
-    hints.push(`cache: ${cacheHeader.toLowerCase()}`);
+    hints.push(t("cache.label", { value: cacheHeader.toLowerCase() }, `cache: ${cacheHeader.toLowerCase()}`));
   }
   if (meta && typeof meta.cached === "boolean") {
-    hints.push(meta.cached ? "cached" : "not cached");
+    hints.push(t(meta.cached ? "cache.cached" : "cache.notCached", null, meta.cached ? "cached" : "not cached"));
   }
   if (meta && meta.stale === true) {
-    hints.push("stale");
+    hints.push(t("cache.stale", null, "stale"));
   }
 
   if (hints.length === 0) {
@@ -110,10 +122,11 @@ const updateCacheHint = (cacheHeader, meta) => {
   }
 
   cacheHint.hidden = false;
-  cacheHint.textContent = hints.join(" · ");
+  cacheHint.textContent = hints.join(t("cache.joiner", null, " · "));
 };
 
 const showState = (state) => {
+  lastState = state;
   emptyState.hidden = state !== "empty";
   loadingState.hidden = state !== "loading";
 
@@ -124,7 +137,7 @@ const showState = (state) => {
 
 const getErrorMessage = (data) => {
   if (!data) {
-    return "Request did not return an ok response.";
+    return t("error.requestNotOk", null, "Request did not return an ok response.");
   }
   if (data.error && typeof data.error === "object" && data.error.message) {
     return data.error.message;
@@ -138,7 +151,7 @@ const getErrorMessage = (data) => {
   if (data.reason) {
     return data.reason;
   }
-  return "Request did not return an ok response.";
+  return t("error.requestNotOk", null, "Request did not return an ok response.");
 };
 
 const getErrorCode = (data) => {
@@ -169,7 +182,7 @@ const appendTextList = (listElement, items, emptyMessage) => {
 
 const renderTopReasons = (reasons) => {
   const safeReasons = Array.isArray(reasons) ? reasons.filter(Boolean).slice(0, MAX_TOP_REASONS) : [];
-  appendTextList(topReasons, safeReasons, "No top reasons available.");
+  appendTextList(topReasons, safeReasons, t("reasons.empty", null, "No top reasons available."));
 };
 
 const createSectionTitle = (text) => {
@@ -216,17 +229,17 @@ const renderChecks = (checks) => {
   if (limitedChecks.length === 0) {
     const row = document.createElement("li");
     row.className = "check-row";
-    row.textContent = "No checks available.";
+    row.textContent = t("checks.empty", null, "No checks available.");
     checksList.appendChild(row);
 
     const emptyDetail = document.createElement("p");
-    emptyDetail.textContent = "No details available.";
+    emptyDetail.textContent = t("details.empty", null, "No details available.");
     checkDetails.appendChild(emptyDetail);
     return;
   }
 
   limitedChecks.forEach((check) => {
-    const labelText = check.label || "Unnamed check";
+    const labelText = check.label || t("checks.label.unnamed", null, "Unnamed check");
     const signalHref = getSignalHref(check.id);
 
     const row = document.createElement("li");
@@ -255,7 +268,7 @@ const renderChecks = (checks) => {
       const learnMoreLink = document.createElement("a");
       learnMoreLink.href = signalHref;
       learnMoreLink.className = "learn-more-link";
-      learnMoreLink.textContent = "Learn more";
+      learnMoreLink.textContent = t("checks.learnMore", null, "Learn more");
       links.appendChild(learnMoreLink);
       row.appendChild(links);
     }
@@ -271,22 +284,22 @@ const renderChecks = (checks) => {
     details.appendChild(summary);
 
     if (check.detail) {
-      details.appendChild(createSectionTitle("Detail"));
+      details.appendChild(createSectionTitle(t("details.section.detail", null, "Detail")));
       details.appendChild(createParagraph(check.detail));
     }
 
     if (Array.isArray(check.evidence) && check.evidence.length > 0) {
-      details.appendChild(createSectionTitle("Evidence"));
+      details.appendChild(createSectionTitle(t("details.section.evidence", null, "Evidence")));
       details.appendChild(createList(check.evidence));
     }
 
     if (Array.isArray(check.howToVerify) && check.howToVerify.length > 0) {
-      details.appendChild(createSectionTitle("How to verify"));
+      details.appendChild(createSectionTitle(t("details.section.howToVerify", null, "How to verify")));
       details.appendChild(createList(check.howToVerify));
     }
 
     if (details.children.length === 1) {
-      details.appendChild(createParagraph("No additional detail available."));
+      details.appendChild(createParagraph(t("details.section.none", null, "No additional detail available.")));
     }
 
     detailsWrapper.appendChild(details);
@@ -340,12 +353,22 @@ const getCanonicalShareUrl = (params) => {
     chain: params.chain,
     address: params.address,
   });
+  const lang = (document.documentElement.lang || "").toLowerCase();
+  if (lang) {
+    shareParams.set("lang", lang);
+  }
   return `${window.location.origin}${window.location.pathname}?${shareParams.toString()}`;
 };
 
 const updateUrlFromParams = (params) => {
-  const canonicalUrl = getCanonicalShareUrl(params);
-  window.history.replaceState({ ...params }, "", canonicalUrl);
+  const url = new URL(window.location.href);
+  url.searchParams.set("chain", params.chain);
+  url.searchParams.set("address", params.address);
+  const lang = (document.documentElement.lang || "").toLowerCase();
+  if (lang) {
+    url.searchParams.set("lang", lang);
+  }
+  window.history.replaceState({ ...params, lang }, "", url.toString());
 };
 
 const resetCopyFeedback = () => {
@@ -370,6 +393,7 @@ const showCopyFeedback = (message) => {
 
 const setCurrentInspectParams = (params) => {
   currentInspectParams = params ? { ...params } : null;
+  lastInspectParams = currentInspectParams ? { ...currentInspectParams } : null;
   if (!currentInspectParams) {
     resetCopyFeedback();
     return;
@@ -378,20 +402,24 @@ const setCurrentInspectParams = (params) => {
 };
 
 const renderSuccess = (data, cacheHeader, params) => {
+  lastResponseData = data;
+  lastCacheHeader = cacheHeader || "";
   const result = data.result || {};
   showErrorBox("");
   updateCacheHint(cacheHeader, data.meta);
   setBadge(overallBadge, result.overallRisk);
-  overallSummary.textContent = result.summary || "No summary available.";
+  overallSummary.textContent = result.summary || t("overall.summary.missing", null, "No summary available.");
   renderTopReasons(result.topReasons);
   renderChecks(data.checks);
   setCurrentInspectParams(params);
 };
 
 const renderError = (data, cacheHeader, params) => {
+  lastResponseData = data;
+  lastCacheHeader = cacheHeader || "";
   const message = getErrorMessage(data);
   const code = getErrorCode(data);
-  const suffix = code ? ` (code: ${code})` : "";
+  const suffix = code ? t("error.codeSuffix", { code }, ` (code: ${code})`) : "";
   showErrorBox(`${message}${suffix}`);
   updateCacheHint(cacheHeader, data?.meta);
   setBadge(overallBadge, "unknown");
@@ -418,6 +446,8 @@ const renderValidationError = (message) => {
   });
   updateStatus(message);
   setCurrentInspectParams(null);
+  lastResponseData = null;
+  lastCacheHeader = "";
 };
 
 const buildUrl = (baseUrl, chain, address) => {
@@ -439,7 +469,7 @@ const parseResponse = async (response) => {
     return {
       error: {
         code: "invalid_response",
-        message: "Response was not valid JSON.",
+        message: t("error.invalidResponse", null, "Response was not valid JSON."),
       },
       raw: text,
     };
@@ -459,7 +489,7 @@ const fetchInspect = async (baseUrl, chain, address) =>
   });
 
 const renderNetworkError = () => {
-  const message = "Network error. Please try again.";
+  const message = t("error.network", null, "Network error. Please try again.");
   showState("error");
   showErrorBox(message);
   updateCacheHint(null, null);
@@ -476,6 +506,8 @@ const renderNetworkError = () => {
   });
   updateStatus(message);
   setCurrentInspectParams(null);
+  lastResponseData = null;
+  lastCacheHeader = "";
 };
 
 const runInspection = async (params, options = {}) => {
@@ -502,7 +534,7 @@ const runInspection = async (params, options = {}) => {
     updateUrlFromParams(canonicalParams);
   }
 
-  updateStatus("Inspecting token… Cached results may be used.");
+  updateStatusKey("status.loading", null, "Inspecting token… Cached results may be used.");
   showState("loading");
   showErrorBox("");
   updateCacheHint(null, null);
@@ -512,8 +544,11 @@ const runInspection = async (params, options = {}) => {
     let response = await fetchInspect("", canonicalParams.chain, canonicalParams.address);
     if (!isJsonResponse(response)) {
       if (WORKERS_API_BASE.includes("REPLACE_ME")) {
-        const message =
-          "API route is not connected on pages.dev. Set WORKERS_API_BASE to your deployed workers.dev URL.";
+        const message = t(
+          "error.missingApiBase",
+          null,
+          "API route is not connected on pages.dev. Set WORKERS_API_BASE to your deployed workers.dev URL.",
+        );
         updateStatus(message);
         showState("error");
         showErrorBox(message);
@@ -542,11 +577,11 @@ const runInspection = async (params, options = {}) => {
     if (data.ok === true) {
       showState("success");
       renderSuccess(data, cacheHeader, canonicalParams);
-      updateStatus("Inspection complete.");
+      updateStatusKey("status.complete", null, "Inspection complete.");
     } else {
       showState("error");
       renderError(data, cacheHeader, canonicalParams);
-      updateStatus(`Request completed with status ${response.status}.`);
+      updateStatusKey("status.httpError", { status: response.status }, `Request completed with status ${response.status}.`);
     }
   } catch (error) {
     renderNetworkError();
@@ -594,7 +629,7 @@ const handleLocationChange = () => {
 
 const handleCopyShareLink = async () => {
   if (!currentInspectParams) {
-    showCopyFeedback("共有リンクがありません");
+    showCopyFeedback(t("share.feedback.none", null, "共有リンクがありません"));
     return;
   }
 
@@ -602,9 +637,9 @@ const handleCopyShareLink = async () => {
 
   try {
     await navigator.clipboard.writeText(shareUrl);
-    showCopyFeedback("コピーしました");
+    showCopyFeedback(t("share.feedback.copied", null, "コピーしました"));
   } catch (error) {
-    showCopyFeedback("コピーできませんでした");
+    showCopyFeedback(t("share.feedback.failed", null, "コピーできませんでした"));
   }
 };
 
@@ -627,5 +662,35 @@ copyShareLinkButton.addEventListener("click", () => {
 });
 
 document.addEventListener("DOMContentLoaded", () => {
+  updateStatusKey("status.idle", null, "Enter a contract address to begin.");
   handleLocationChange();
+});
+
+document.addEventListener("tsi:lang-change", () => {
+  const lang = document.documentElement.lang || "";
+  const shouldUpdateUrl = lang && !new URLSearchParams(window.location.search).has("chain");
+  if (shouldUpdateUrl) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("lang", lang);
+    window.history.replaceState({ lang }, "", url.toString());
+  }
+
+  if (lastState === "loading") {
+    updateStatusKey("status.loading", null, "Inspecting token… Cached results may be used.");
+    return;
+  }
+
+  if (!lastResponseData) {
+    updateCacheHint(null, null);
+    updateStatusKey("status.idle", null, "Enter a contract address to begin.");
+    return;
+  }
+
+  if (lastResponseData.ok === true) {
+    renderSuccess(lastResponseData, lastCacheHeader, lastInspectParams);
+    updateStatusKey("status.complete", null, "Inspection complete.");
+    return;
+  }
+
+  renderError(lastResponseData, lastCacheHeader, lastInspectParams);
 });

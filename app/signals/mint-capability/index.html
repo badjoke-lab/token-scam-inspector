@@ -3,71 +3,79 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Mint capability | Token Scam Inspector</title>
-    <meta name="description" content="Mint capability（追加発行権限）シグナルの意味と、供給変化リスクの確認方法をまとめます。">
+    <title data-i18n="signal.mintCapability.title">Mint capability | Token Scam Inspector</title>
+    <meta name="description" data-i18n-attr="content" data-i18n="signal.mintCapability.description" content="Mint capability（追加発行権限）シグナルの意味、注意点、確認手順を初心者向けに説明します。">
     <link rel="stylesheet" href="../../style.css">
   </head>
   <body>
     <main class="container">
       <header class="page-header">
-        <h1>Mint capability</h1>
-        <p class="subtitle">トークン供給をあとから増やせる可能性を示すシグナルです。</p>
+        <h1 data-i18n="signal.mintCapability.heading">Mint capability</h1>
+        <p class="subtitle" data-i18n="signal.mintCapability.subtitle">供給量を後から増やせる可能性を示すシグナルです。</p>
+        <div class="lang-toggle" role="group" data-i18n-attr="aria-label" data-i18n="lang.toggle.label" aria-label="Language">
+          <button type="button" class="lang-toggle-button" data-lang-switch="ja" data-i18n="lang.toggle.ja">JA</button>
+          <span class="lang-toggle-separator" aria-hidden="true">/</span>
+          <button type="button" class="lang-toggle-button" data-lang-switch="en" data-i18n="lang.toggle.en">EN</button>
+        </div>
       </header>
 
       <section class="signal-section" aria-labelledby="meaning-heading">
-        <h2 id="meaning-heading">1) Meaning</h2>
+        <h2 id="meaning-heading" data-i18n="signals.sections.meaning">1) Meaning</h2>
         <p>
-          Mint capabilityは、mint（追加発行）が可能な設計であることを示します。
-          追加発行の条件が不明だと、将来の供給増加リスクを読み取りづらくなります。
+          Mint capabilityは、トークンの総供給量を後から増やせる可能性を示します。
+          追加発行が可能な設計では、供給量の変化によってバランスが崩れることがあります。
         </p>
       </section>
 
       <section class="signal-section" aria-labelledby="why-heading">
-        <h2 id="why-heading">2) Why it matters</h2>
+        <h2 id="why-heading" data-i18n="signals.sections.why">2) Why it matters</h2>
         <p>
-          供給が大きく増えると、希少性が下がり価格に影響する可能性があります。
-          追加発行のルールが不透明だと、想定外の変化が起きるかもしれません。
+          追加発行ができると、既存の保有割合が薄まる可能性があります。
+          発行権限の有無と、その条件が公開されているかが重要です。
         </p>
       </section>
 
       <section class="signal-section" aria-labelledby="legit-heading">
-        <h2 id="legit-heading">3) Common legit reasons</h2>
+        <h2 id="legit-heading" data-i18n="signals.sections.legit">3) Common legit reasons</h2>
         <ul>
-          <li>ステーキング報酬など、計画的な発行が設計に含まれている</li>
-          <li>上限付きのmintで、発行量が公開されている</li>
-          <li>mint権限がburn済み、または厳しい制御下にある</li>
+          <li>報酬配布やエコシステム拡張を目的とした設計</li>
+          <li>発行上限とルールが明確に定義されているケース</li>
+          <li>ガバナンスにより制御される前提のケース</li>
         </ul>
       </section>
 
       <section class="signal-section" aria-labelledby="verify-heading">
-        <h2 id="verify-heading">4) How to verify</h2>
+        <h2 id="verify-heading" data-i18n="signals.sections.how">4) How to verify</h2>
         <ul>
-          <li>エクスプローラーでtotalSupplyの推移を見る</li>
-          <li>ContractのCode / Writeでmint関連関数を確認する</li>
-          <li>mint権限を持つアドレスやroleを追跡する</li>
-          <li>公式資料に発行計画や上限の説明があるか確認する</li>
+          <li>Codeタブでmint / _mint / mintToの有無を確認する</li>
+          <li>誰がmintできるか（owner/role/onlyOwner等）を確認する</li>
+          <li>発行上限（cap）があるか、または無制限かを確認する</li>
+          <li>発行履歴がある場合は、過去の発行量と頻度を確認する</li>
         </ul>
       </section>
 
       <section class="signal-section" aria-labelledby="limits-heading">
-        <h2 id="limits-heading">5) What this tool can/can’t detect</h2>
+        <h2 id="limits-heading" data-i18n="signals.sections.limits">5) What this tool can/can’t detect</h2>
         <p>
-          このツールは、mintの可能性を示すシグナルを検出します。
-          ただし、発行上限や運用ポリシーの正確さまでは保証できません。
+          このツールは、追加発行に関連する関数や権限の兆候を探します。
+          ただし、実際に今後どれだけ発行されるかは保証できません。
         </p>
         <ul>
-          <li>検出できること：mint機能や権限の存在</li>
-          <li>検出が難しいこと：将来の運用判断や例外条件</li>
+          <li>検出できること：追加発行関数や権限の存在</li>
+          <li>検出が難しいこと：運用上の制約や将来の判断</li>
         </ul>
       </section>
 
       <section class="signal-section" aria-labelledby="links-heading">
-        <h2 id="links-heading">6) Links</h2>
+        <h2 id="links-heading" data-i18n="signals.sections.links">6) Links</h2>
         <p class="back-links">
-          <a href="../../">Back to results</a>
-          <a href="../../guide/">Back to guide</a>
+          <a href="../../" data-i18n="signals.back">Back to results</a>
+          <a href="../../guide/" data-i18n="signals.guide">Back to guide</a>
         </p>
       </section>
     </main>
+    <script src="../../assets/i18n/ja.js"></script>
+    <script src="../../assets/i18n/en.js"></script>
+    <script src="../../assets/i18n.js"></script>
   </body>
 </html>

@@ -3,19 +3,24 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Sell restriction | Token Scam Inspector</title>
-    <meta name="description" content="Sell restriction（売却制限）シグナルの意味、注意点、確認手順を初心者向けに説明します。">
+    <title data-i18n="signal.sellRestriction.title">Sell restriction | Token Scam Inspector</title>
+    <meta name="description" data-i18n-attr="content" data-i18n="signal.sellRestriction.description" content="Sell restriction（売却制限）シグナルの意味、注意点、確認手順を初心者向けに説明します。">
     <link rel="stylesheet" href="../../style.css">
   </head>
   <body>
     <main class="container">
       <header class="page-header">
-        <h1>Sell restriction</h1>
-        <p class="subtitle">売却できない、または極端に不利になる可能性を示すシグナルです。</p>
+        <h1 data-i18n="signal.sellRestriction.heading">Sell restriction</h1>
+        <p class="subtitle" data-i18n="signal.sellRestriction.subtitle">売却できない、または極端に不利になる可能性を示すシグナルです。</p>
+        <div class="lang-toggle" role="group" data-i18n-attr="aria-label" data-i18n="lang.toggle.label" aria-label="Language">
+          <button type="button" class="lang-toggle-button" data-lang-switch="ja" data-i18n="lang.toggle.ja">JA</button>
+          <span class="lang-toggle-separator" aria-hidden="true">/</span>
+          <button type="button" class="lang-toggle-button" data-lang-switch="en" data-i18n="lang.toggle.en">EN</button>
+        </div>
       </header>
 
       <section class="signal-section" aria-labelledby="meaning-heading">
-        <h2 id="meaning-heading">1) Meaning</h2>
+        <h2 id="meaning-heading" data-i18n="signals.sections.meaning">1) Meaning</h2>
         <p>
           Sell restrictionは、買えるのに売れない、または売却条件が極端に厳しい可能性を示します。
           典型的には、売却時だけ非常に高い税率や制限がかかる設計を指します。
@@ -23,7 +28,7 @@
       </section>
 
       <section class="signal-section" aria-labelledby="why-heading">
-        <h2 id="why-heading">2) Why it matters</h2>
+        <h2 id="why-heading" data-i18n="signals.sections.why">2) Why it matters</h2>
         <p>
           売却が制限されると、ポジションを解消できなくなるリスクがあります。
           価格が表示されていても、実際に売れるとは限りません。
@@ -31,7 +36,7 @@
       </section>
 
       <section class="signal-section" aria-labelledby="legit-heading">
-        <h2 id="legit-heading">3) Common legit reasons</h2>
+        <h2 id="legit-heading" data-i18n="signals.sections.legit">3) Common legit reasons</h2>
         <ul>
           <li>ローンチ直後の一時的な制限（数分〜数時間）</li>
           <li>ボット対策としての段階的な制限</li>
@@ -40,7 +45,7 @@
       </section>
 
       <section class="signal-section" aria-labelledby="verify-heading">
-        <h2 id="verify-heading">4) How to verify</h2>
+        <h2 id="verify-heading" data-i18n="signals.sections.how">4) How to verify</h2>
         <ul>
           <li>公式が案内するDEXとペアを確認する</li>
           <li>エクスプローラーで直近のsellトランザクションが通っているか見る</li>
@@ -50,7 +55,7 @@
       </section>
 
       <section class="signal-section" aria-labelledby="limits-heading">
-        <h2 id="limits-heading">5) What this tool can/can’t detect</h2>
+        <h2 id="limits-heading" data-i18n="signals.sections.limits">5) What this tool can/can’t detect</h2>
         <p>
           このツールは、公開情報から売却制限の兆候を探します。
           ただし、実際の売却可否や最新の設定値までは常に保証できません。
@@ -62,12 +67,15 @@
       </section>
 
       <section class="signal-section" aria-labelledby="links-heading">
-        <h2 id="links-heading">6) Links</h2>
+        <h2 id="links-heading" data-i18n="signals.sections.links">6) Links</h2>
         <p class="back-links">
-          <a href="../../">Back to results</a>
-          <a href="../../guide/">Back to guide</a>
+          <a href="../../" data-i18n="signals.back">Back to results</a>
+          <a href="../../guide/" data-i18n="signals.guide">Back to guide</a>
         </p>
       </section>
     </main>
+    <script src="../../assets/i18n/ja.js"></script>
+    <script src="../../assets/i18n/en.js"></script>
+    <script src="../../assets/i18n.js"></script>
   </body>
 </html>

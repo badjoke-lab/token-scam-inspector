@@ -3,88 +3,96 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Beginner Guide | Token Scam Inspector</title>
-    <meta name="description" content="Token Scam Inspectorの見方と注意点を初心者向けにまとめたガイドです。結果の読み方と確認手順を中立に説明します。">
+    <title data-i18n="guide.title">Beginner Guide | Token Scam Inspector</title>
+    <meta name="description" data-i18n-attr="content" data-i18n="guide.description" content="Token Scam Inspectorの見方と注意点を初心者向けにまとめたガイドです。結果の読み方と確認手順を中立に説明します。">
     <link rel="stylesheet" href="../style.css">
   </head>
   <body>
     <main class="container">
       <header class="page-header">
-        <h1>Beginner guide</h1>
-        <p class="subtitle">Risk signalsの意味を落ち着いて読むためのページです。</p>
+        <h1 data-i18n="guide.heading">Beginner guide</h1>
+        <p class="subtitle" data-i18n="guide.subtitle">Risk signalsの意味を落ち着いて読むためのページです。</p>
+        <div class="lang-toggle" role="group" data-i18n-attr="aria-label" data-i18n="lang.toggle.label" aria-label="Language">
+          <button type="button" class="lang-toggle-button" data-lang-switch="ja" data-i18n="lang.toggle.ja">JA</button>
+          <span class="lang-toggle-separator" aria-hidden="true">/</span>
+          <button type="button" class="lang-toggle-button" data-lang-switch="en" data-i18n="lang.toggle.en">EN</button>
+        </div>
         <p class="back-links">
-          <a href="../">Back to results</a>
+          <a href="../" data-i18n="guide.back">Back to results</a>
         </p>
       </header>
 
       <section class="guide-section" aria-labelledby="guide-what-heading">
-        <h2 id="guide-what-heading">What this tool does</h2>
-        <p>
+        <h2 id="guide-what-heading" data-i18n="guide.what.heading">What this tool does</h2>
+        <p data-i18n="guide.what.p1">
           Token Scam Inspectorは、トークンのリスクシグナルを可視化するツールです。
           7つの観点で「注意したいパターンがあるか」を整理して表示します。
         </p>
         <ul>
-          <li>リスクの理由を短い言葉でまとめます</li>
-          <li>各チェックの詳細と確認手順に進めます</li>
-          <li>取得できなかった情報は、その理由ごと表示します</li>
+          <li data-i18n="guide.what.li1">リスクの理由を短い言葉でまとめます</li>
+          <li data-i18n="guide.what.li2">各チェックの詳細と確認手順に進めます</li>
+          <li data-i18n="guide.what.li3">取得できなかった情報は、その理由ごと表示します</li>
         </ul>
       </section>
 
       <section class="guide-section" aria-labelledby="guide-not-heading">
-        <h2 id="guide-not-heading">What this tool does NOT do</h2>
-        <p>このツールは「断定」や「助言」を行いません。</p>
+        <h2 id="guide-not-heading" data-i18n="guide.not.heading">What this tool does NOT do</h2>
+        <p data-i18n="guide.not.p1">このツールは「断定」や「助言」を行いません。</p>
         <ul>
-          <li>「詐欺かどうか」を確定するものではありません</li>
-          <li>売買や投資判断をすすめるものではありません</li>
-          <li>unknownは「安全」の意味ではなく「未確認」です</li>
+          <li data-i18n="guide.not.li1">「詐欺かどうか」を確定するものではありません</li>
+          <li data-i18n="guide.not.li2">売買や投資判断をすすめるものではありません</li>
+          <li data-i18n="guide.not.li3">unknownは「安全」の意味ではなく「未確認」です</li>
         </ul>
-        <p class="note-block">This tool does not provide a verdict or investment advice.</p>
+        <p class="note-block" data-i18n="guide.not.note">This tool does not provide a verdict or investment advice.</p>
       </section>
 
       <section class="guide-section" aria-labelledby="guide-read-heading">
-        <h2 id="guide-read-heading">How to read the results</h2>
-        <p>上から順に読むと、全体像と理由がつながります。</p>
+        <h2 id="guide-read-heading" data-i18n="guide.read.heading">How to read the results</h2>
+        <p data-i18n="guide.read.p1">上から順に読むと、全体像と理由がつながります。</p>
         <ol>
-          <li><strong>overallRisk</strong>：全体のリスク水準（説明の入口）</li>
-          <li><strong>topReasons</strong>：特に注意したい理由の要約</li>
-          <li><strong>checks</strong>：7項目それぞれの短い説明</li>
-          <li><strong>details</strong>：根拠と確認手順（自分で確かめるための部分）</li>
-          <li><strong>raw JSON</strong>：生データ（共有や検証に便利）</li>
+          <li data-i18n="guide.read.li1"><strong>overallRisk</strong>：全体のリスク水準（説明の入口）</li>
+          <li data-i18n="guide.read.li2"><strong>topReasons</strong>：特に注意したい理由の要約</li>
+          <li data-i18n="guide.read.li3"><strong>checks</strong>：7項目それぞれの短い説明</li>
+          <li data-i18n="guide.read.li4"><strong>details</strong>：根拠と確認手順（自分で確かめるための部分）</li>
+          <li data-i18n="guide.read.li5"><strong>raw JSON</strong>：生データ（共有や検証に便利）</li>
         </ol>
-        <p>
+        <p data-i18n="guide.read.p2">
           unknownは「確認できなかった」を意味します。
           問題がないという意味ではないため、理由を読んで追加確認してください。
         </p>
-        <p>
+        <p data-i18n="guide.read.p3">
           cached / stale が表示される場合は、直近の結果を再利用しています。
           staleは「古い可能性がある結果」を意味します。
         </p>
       </section>
 
       <section class="guide-section" aria-labelledby="guide-example-heading">
-        <h2 id="guide-example-heading">Example walkthrough</h2>
-        <p>例：topReasonsに「Owner can change trading rules」と出た場合。</p>
+        <h2 id="guide-example-heading" data-i18n="guide.example.heading">Example walkthrough</h2>
+        <p data-i18n="guide.example.p1">例：topReasonsに「Owner can change trading rules」と出た場合。</p>
         <ol>
-          <li>ChecksでOwner privilegesの行を確認します</li>
-          <li>Detailsを開き、どの権限が問題になりうるかを読みます</li>
-          <li>「Learn more」から辞書ページに進み、確認手順に沿って探索します</li>
+          <li data-i18n="guide.example.li1">ChecksでOwner privilegesの行を確認します</li>
+          <li data-i18n="guide.example.li2">Detailsを開き、どの権限が問題になりうるかを読みます</li>
+          <li data-i18n="guide.example.li3">「Learn more」から辞書ページに進み、確認手順に沿って探索します</li>
         </ol>
-        <p>
+        <p data-i18n="guide.example.p2">
           ここまで読んで「判断材料が不足している」と感じたら、unknownを含めて保留にするのが自然です。
         </p>
       </section>
 
       <section class="guide-section" aria-labelledby="guide-safety-heading">
-        <h2 id="guide-safety-heading">Safety notes and disclaimer</h2>
+        <h2 id="guide-safety-heading" data-i18n="guide.safety.heading">Safety notes and disclaimer</h2>
         <ul>
-          <li>自動チェックは取りこぼしや誤検知がありえます</li>
-          <li>短期で挙動が変わるトークンもあります</li>
-          <li>最終的には一次情報（エクスプローラーやトランザクション）を確認してください</li>
+          <li data-i18n="guide.safety.li1">自動チェックは取りこぼしや誤検知がありえます</li>
+          <li data-i18n="guide.safety.li2">短期で挙動が変わるトークンもあります</li>
+          <li data-i18n="guide.safety.li3">最終的には一次情報（エクスプローラーやトランザクション）を確認してください</li>
         </ul>
-        <p class="note-block">
+        <p class="note-block" data-i18n="guide.safety.note">
           This tool does not provide investment advice. Results may be incomplete or incorrect. Always do your own research (DYOR).
         </p>
       </section>
     </main>
+    <script src="../assets/i18n/ja.js"></script>
+    <script src="../assets/i18n/en.js"></script>
+    <script src="../assets/i18n.js"></script>
   </body>
 </html>

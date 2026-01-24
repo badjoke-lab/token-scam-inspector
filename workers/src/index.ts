@@ -8,6 +8,8 @@ import {
   getBlockingUpstreamError,
 } from "./utils/errors";
 import { findSignals, formatEvidence, preprocessSource, type SignalPattern } from "./utils/sourceScan";
+import { fetchTokenIdentity } from "./providers/tokenIdentity";
+import type { TokenIdentityResult } from "./providers/tokenIdentityTypes";
 
 const jsonResponse = (body: unknown, init?: ResponseInit): Response => {
   const headers = new Headers(init?.headers);
@@ -32,6 +34,12 @@ const CACHE_HEADER_NAME = "x-tsi-cache";
 type CacheState = "HIT" | "MISS" | "STALE";
 
 type InspectSuccessResponse = ReturnType<typeof buildInspectPayload>;
+
+type Env = {
+  ETHERSCAN_API_KEY?: string;
+  ETH_RPC_URL?: string;
+  BSC_RPC_URL?: string;
+};
 
 type InspectErrorResponse = {
   ok: false;
@@ -940,6 +948,7 @@ const buildInspectPayload = (
   cached: boolean,
   generatedAt: string,
   explorerFacts?: ExplorerFacts,
+  tokenIdentity?: TokenIdentityResult,
   stale = false,
   ts = buildMetaTs()
 ) => {
@@ -963,6 +972,7 @@ const buildInspectPayload = (
       overallRisk,
       summary,
       topReasons,
+      ...(tokenIdentity ? { token: tokenIdentity } : {}),
     },
     checks,
     meta: { generatedAt, cached, stale, ts },
@@ -970,6 +980,17 @@ const buildInspectPayload = (
 };
 
 type CachedInspectPayload = InspectSuccessResponse;
+
+const buildFailedTokenIdentity = (notes: string): TokenIdentityResult => ({
+  name: null,
+  symbol: null,
+  decimals: null,
+  evidence: {
+    source: "rpc_eth_call",
+    status: "failed",
+    notes,
+  },
+});
 
 const readCachedPayload = async (
   response: Response
@@ -1002,10 +1023,7 @@ const buildStalePayload = (payload: CachedInspectPayload): CachedInspectPayload 
 };
 
 export default {
-  async fetch(
-    request: Request,
-    env?: { ETHERSCAN_API_KEY?: string }
-  ): Promise<Response> {
+  async fetch(request: Request, env: Env = {}): Promise<Response> {
     const url = new URL(request.url);
 
     if (
@@ -1125,11 +1143,24 @@ export default {
         const explorerFacts = await fetchExplorerFacts(
           chain as Chain,
           address,
-          env?.ETHERSCAN_API_KEY
+          env.ETHERSCAN_API_KEY
         );
         const blockingError = getBlockingUpstreamError(explorerFacts);
         if (blockingError) {
           throw new InspectRouteError(blockingError);
+        }
+
+        let tokenIdentity: TokenIdentityResult;
+        try {
+          tokenIdentity = await fetchTokenIdentity(
+            cache,
+            url.origin,
+            chain as Chain,
+            address,
+            env
+          );
+        } catch (error) {
+          tokenIdentity = buildFailedTokenIdentity("token_identity_unavailable");
         }
 
         const responseBody = buildInspectPayload(
@@ -1138,6 +1169,7 @@ export default {
           false,
           generatedAt,
           explorerFacts,
+          tokenIdentity,
           false,
           generatedAt
         );
@@ -1151,6 +1183,7 @@ export default {
           true,
           generatedAt,
           explorerFacts,
+          tokenIdentity,
           false,
           generatedAt
         );

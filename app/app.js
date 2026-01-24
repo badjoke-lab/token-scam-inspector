@@ -21,12 +21,21 @@ const topReasons = document.getElementById("top-reasons");
 const checksList = document.getElementById("checks-list");
 const checkDetails = document.getElementById("check-details");
 
+const copyShareLinkButton = document.getElementById("copy-share-link");
+const copyFeedback = document.getElementById("copy-feedback");
+
 const WORKERS_API_BASE = "https://lingering-frog-8773.badjoke-lab.workers.dev";
 
 const MAX_TOP_REASONS = 5;
 const CHECK_LIMIT = 7;
+const COPY_FEEDBACK_MS = 2000;
+
+const ALLOWED_CHAINS = new Set(["eth", "bsc"]);
+const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
 
 let isLoading = false;
+let copyFeedbackTimerId = null;
+let currentInspectParams = null;
 
 const setLoading = (loading) => {
   isLoading = loading;
@@ -252,7 +261,90 @@ const renderChecks = (checks) => {
   });
 };
 
-const renderSuccess = (data, cacheHeader) => {
+const canonicalizeChain = (chain) => (chain || "").trim().toLowerCase();
+
+const canonicalizeAddress = (address) => (address || "").trim().toLowerCase();
+
+const isValidChain = (chain) => ALLOWED_CHAINS.has(chain);
+
+const isValidAddress = (address) => ADDRESS_REGEX.test(address);
+
+const validateInspectParams = ({ chain, address }) => {
+  const errors = [];
+
+  if (!chain) {
+    errors.push("chain required");
+  } else if (!isValidChain(chain)) {
+    errors.push("invalid chain (allowed: eth, bsc)");
+  }
+
+  if (!address) {
+    errors.push("address required");
+  } else if (!isValidAddress(address)) {
+    errors.push("invalid address format (expected 0x + 40 hex)");
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+  };
+};
+
+const getCanonicalParamsFromInputs = () => ({
+  chain: canonicalizeChain(chainInput.value),
+  address: canonicalizeAddress(addressInput.value),
+});
+
+const setFormValues = ({ chain, address }) => {
+  if (chain && isValidChain(chain)) {
+    chainInput.value = chain;
+  }
+  addressInput.value = address || "";
+};
+
+const getCanonicalShareUrl = (params) => {
+  const shareParams = new URLSearchParams({
+    chain: params.chain,
+    address: params.address,
+  });
+  return `${window.location.origin}${window.location.pathname}?${shareParams.toString()}`;
+};
+
+const updateUrlFromParams = (params) => {
+  const canonicalUrl = getCanonicalShareUrl(params);
+  window.history.replaceState({ ...params }, "", canonicalUrl);
+};
+
+const resetCopyFeedback = () => {
+  if (copyFeedbackTimerId) {
+    window.clearTimeout(copyFeedbackTimerId);
+    copyFeedbackTimerId = null;
+  }
+  copyFeedback.hidden = true;
+  copyFeedback.textContent = "";
+};
+
+const showCopyFeedback = (message) => {
+  resetCopyFeedback();
+  copyFeedback.hidden = false;
+  copyFeedback.textContent = message;
+  copyFeedbackTimerId = window.setTimeout(() => {
+    copyFeedback.hidden = true;
+    copyFeedback.textContent = "";
+    copyFeedbackTimerId = null;
+  }, COPY_FEEDBACK_MS);
+};
+
+const setCurrentInspectParams = (params) => {
+  currentInspectParams = params ? { ...params } : null;
+  if (!currentInspectParams) {
+    resetCopyFeedback();
+    return;
+  }
+  resetCopyFeedback();
+};
+
+const renderSuccess = (data, cacheHeader, params) => {
   const result = data.result || {};
   showErrorBox("");
   updateCacheHint(cacheHeader, data.meta);
@@ -260,9 +352,10 @@ const renderSuccess = (data, cacheHeader) => {
   overallSummary.textContent = result.summary || "No summary available.";
   renderTopReasons(result.topReasons);
   renderChecks(data.checks);
+  setCurrentInspectParams(params);
 };
 
-const renderError = (data, cacheHeader) => {
+const renderError = (data, cacheHeader, params) => {
   const message = getErrorMessage(data);
   const code = getErrorCode(data);
   const suffix = code ? ` (code: ${code})` : "";
@@ -272,6 +365,26 @@ const renderError = (data, cacheHeader) => {
   overallSummary.textContent = message;
   renderTopReasons([]);
   renderChecks([]);
+  setCurrentInspectParams(params);
+};
+
+const renderValidationError = (message) => {
+  showState("error");
+  showErrorBox(message);
+  updateCacheHint(null, null);
+  setBadge(overallBadge, "unknown");
+  overallSummary.textContent = message;
+  renderTopReasons([]);
+  renderChecks([]);
+  renderJson({
+    ok: false,
+    error: {
+      code: "invalid_input",
+      message,
+    },
+  });
+  updateStatus(message);
+  setCurrentInspectParams(null);
 };
 
 const buildUrl = (baseUrl, chain, address) => {
@@ -329,20 +442,32 @@ const renderNetworkError = () => {
     },
   });
   updateStatus(message);
+  setCurrentInspectParams(null);
 };
 
-showState("empty");
-renderJson({});
+const runInspection = async (params, options = {}) => {
+  const { updateHistory = true } = options;
 
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
+  const validation = validateInspectParams(params);
+  if (!validation.ok) {
+    renderValidationError(validation.errors.join(" / "));
+    return;
+  }
 
   if (isLoading) {
     return;
   }
 
-  const chain = chainInput.value.trim().toLowerCase();
-  const address = addressInput.value.trim().toLowerCase();
+  const canonicalParams = {
+    chain: canonicalizeChain(params.chain),
+    address: canonicalizeAddress(params.address),
+  };
+
+  setFormValues(canonicalParams);
+
+  if (updateHistory) {
+    updateUrlFromParams(canonicalParams);
+  }
 
   updateStatus("Inspecting token… Cached results may be used.");
   showState("loading");
@@ -351,7 +476,7 @@ form.addEventListener("submit", async (event) => {
   setLoading(true);
 
   try {
-    let response = await fetchInspect("", chain, address);
+    let response = await fetchInspect("", canonicalParams.chain, canonicalParams.address);
     if (!isJsonResponse(response)) {
       if (WORKERS_API_BASE.includes("REPLACE_ME")) {
         const message =
@@ -370,9 +495,10 @@ form.addEventListener("submit", async (event) => {
             message,
           },
         });
+        setCurrentInspectParams(null);
         return;
       }
-      response = await fetchInspect(WORKERS_API_BASE, chain, address);
+      response = await fetchInspect(WORKERS_API_BASE, canonicalParams.chain, canonicalParams.address);
     }
 
     const data = await parseResponse(response);
@@ -382,11 +508,11 @@ form.addEventListener("submit", async (event) => {
 
     if (data.ok === true) {
       showState("success");
-      renderSuccess(data, cacheHeader);
+      renderSuccess(data, cacheHeader, canonicalParams);
       updateStatus("Inspection complete.");
     } else {
       showState("error");
-      renderError(data, cacheHeader);
+      renderError(data, cacheHeader, canonicalParams);
       updateStatus(`Request completed with status ${response.status}.`);
     }
   } catch (error) {
@@ -394,4 +520,79 @@ form.addEventListener("submit", async (event) => {
   } finally {
     setLoading(false);
   }
+};
+
+const readParamsFromLocation = () => {
+  const params = new URLSearchParams(window.location.search);
+  const hasChain = params.has("chain");
+  const hasAddress = params.has("address");
+
+  if (!hasChain && !hasAddress) {
+    return {
+      hasParams: false,
+      chain: "",
+      address: "",
+    };
+  }
+
+  return {
+    hasParams: true,
+    chain: canonicalizeChain(params.get("chain") || ""),
+    address: canonicalizeAddress(params.get("address") || ""),
+  };
+};
+
+const handleLocationChange = () => {
+  const locationParams = readParamsFromLocation();
+  if (!locationParams.hasParams) {
+    return;
+  }
+
+  const validation = validateInspectParams(locationParams);
+  setFormValues(locationParams);
+
+  if (validation.ok) {
+    runInspection(locationParams, { updateHistory: false });
+    return;
+  }
+
+  renderValidationError(validation.errors.join(" / "));
+};
+
+const handleCopyShareLink = async () => {
+  if (!currentInspectParams) {
+    showCopyFeedback("共有リンクがありません");
+    return;
+  }
+
+  const shareUrl = getCanonicalShareUrl(currentInspectParams);
+
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    showCopyFeedback("コピーしました");
+  } catch (error) {
+    showCopyFeedback("コピーできませんでした");
+  }
+};
+
+showState("empty");
+renderJson({});
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const params = getCanonicalParamsFromInputs();
+  runInspection(params, { updateHistory: true });
+});
+
+window.addEventListener("popstate", () => {
+  handleLocationChange();
+});
+
+copyShareLinkButton.addEventListener("click", () => {
+  handleCopyShareLink();
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  handleLocationChange();
 });

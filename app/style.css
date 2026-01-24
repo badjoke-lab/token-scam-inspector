@@ -192,6 +192,15 @@ details summary:focus {
   color: #555;
 }
 
+.share-block {
+  gap: 6px;
+}
+
+.copy-feedback {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
 .raw-json pre {
   margin: 8px 0 0;
   padding: 12px;
